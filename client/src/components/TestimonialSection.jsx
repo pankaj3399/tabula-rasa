@@ -1,57 +1,69 @@
+// src/components/TestimonialSection.jsx
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Quote } from 'lucide-react';
+import { Quote, Star } from 'lucide-react';
 
 const TestimonialSection = () => {
   const testimonials = [
     {
-      quote: "Tabula Rasa completely transformed my medical study approach. The personalized learning paths are game-changing!",
+      quote: "Tabula Rasa transformed my study approach with its personalized learning paths!",
       name: "Dr. Emily Roberts",
-      specialty: "Cardiology Resident"
+      specialty: "Cardiology Resident",
+      rating: 5,
     },
     {
-      quote: "The performance tracking features helped me identify my weak areas and improve my overall understanding.",
+      quote: "The performance tracking helped me pinpoint and improve my weak areas.",
       name: "Michael Chen",
-      specialty: "Medical Student"
+      specialty: "Medical Student",
+      rating: 4,
     },
     {
-      quote: "An incredible platform that combines technology with medical education. Highly recommended for serious learners!",
+      quote: "A must-have platform for serious medical learners—technology meets education!",
       name: "Sarah Thompson",
-      specialty: "Pediatrics Trainee"
-    }
+      specialty: "Pediatrics Trainee",
+      rating: 5,
+    },
   ];
 
   return (
-    <section className="py-16 bg-white rounded-xl shadow-lg">
-      <div className="text-center mb-12">
-        <h2 className="text-4xl font-bold text-purple-800 mb-4">
-          What Our Students Say
+    <section className="py-20 bg-gradient-to-b from-white to-purple-50">
+      <div className="text-center mb-16">
+        <h2 className="text-5xl font-bold text-purple-800 mb-4 tracking-tight">
+          Voices of Success
         </h2>
-        <p className="text-gray-600 max-w-2xl mx-auto">
-          Hear from medical professionals who have accelerated their learning 
-          with Tabula Rasa.
+        <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+          Discover how Tabula Rasa empowers medical professionals and students worldwide.
         </p>
       </div>
 
-      <div className="grid md:grid-cols-3 gap-8 px-8">
+      <div className="grid md:grid-cols-3 gap-10 px-6 md:px-12">
         {testimonials.map((testimonial, index) => (
-          <motion.div 
+          <motion.div
             key={index}
-            whileHover={{ scale: 1.05 }}
-            className="bg-purple-50 p-6 rounded-xl relative"
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6, delay: index * 0.2 }}
+            whileHover={{ scale: 1.03 }}
+            className="bg-white p-8 rounded-2xl shadow-lg relative border border-purple-100"
           >
-            <Quote className="absolute top-4 left-4 text-purple-300 w-10 h-10" />
-            <p className="text-gray-700 italic mb-6">
+            <Quote className="absolute top-4 left-4 text-purple-200 w-12 h-12 opacity-50" />
+            <p className="text-gray-700 italic text-lg mb-6 mt-6">
               "{testimonial.quote}"
             </p>
-            <div className="flex items-center">
+            <div className="flex items-center justify-between">
               <div>
-                <h4 className="font-semibold text-purple-800">
+                <h4 className="font-semibold text-purple-800 text-xl">
                   {testimonial.name}
                 </h4>
                 <p className="text-gray-600 text-sm">
                   {testimonial.specialty}
                 </p>
+              </div>
+              <div className="flex">
+                {Array(testimonial.rating).fill().map((_, i) => (
+                  <Star key={i} className="w-5 h-5 text-yellow-400 fill-current" />
+                ))}
               </div>
             </div>
           </motion.div>

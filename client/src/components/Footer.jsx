@@ -1,63 +1,74 @@
+// src/components/Footer.jsx
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { 
-  Facebook, 
-  Twitter, 
-  Instagram, 
-  Linkedin, 
-  Book 
-} from 'lucide-react';
+import { Facebook, Twitter, Instagram, Linkedin, Book } from 'lucide-react';
 
 const Footer = () => {
   const currentYear = new Date().getFullYear();
 
+  const sections = [
+    {
+      title: 'Quick Links',
+      links: [
+        { to: '/', label: 'Home' },
+        { to: '/features', label: 'Features' },
+        { to: '/pricing', label: 'Pricing' },
+        { to: '/support', label: 'Support' },
+      ],
+    },
+    {
+      title: 'Resources',
+      links: [
+        { to: '/blog', label: 'Blog' },
+        { to: '/webinars', label: 'Webinars' },
+        { to: '/faq', label: 'FAQ' },
+        { to: '/terms', label: 'Terms of Service' },
+      ],
+    },
+  ];
+
   return (
-    <footer className="bg-purple-800 text-white py-12">
-      <div className="container mx-auto px-4">
-        <div className="grid md:grid-cols-4 gap-8">
+    <footer className="bg-gradient-to-b from-purple-900 to-indigo-900 text-white py-16">
+      <div className="container mx-auto px-6">
+        <div className="grid md:grid-cols-4 gap-12">
           <div>
-            <h3 className="text-2xl font-bold mb-4 flex items-center">
-              <Book className="mr-2" /> Tabula Rasa
+            <h3 className="text-3xl font-bold mb-6 flex items-center">
+              <Book className="mr-3 w-8 h-8" /> Tabula Rasa
             </h3>
-            <p className="text-purple-200">
-              Revolutionizing medical education through personalized, 
-              technology-driven learning experiences.
+            <p className="text-purple-100 leading-relaxed">
+              Empowering the future of medical education with innovative, personalized learning solutions.
             </p>
           </div>
 
-          <div>
-            <h4 className="font-semibold mb-4">Quick Links</h4>
-            <ul className="space-y-2">
-              <li><Link to="/" className="hover:text-purple-200">Home</Link></li>
-              <li><Link to="/features" className="hover:text-purple-200">Features</Link></li>
-              <li><Link to="/pricing" className="hover:text-purple-200">Pricing</Link></li>
-              <li><Link to="/support" className="hover:text-purple-200">Support</Link></li>
-            </ul>
-          </div>
+          {sections.map(({ title, links }) => (
+            <div key={title}>
+              <h4 className="font-semibold text-xl mb-6 text-purple-200">{title}</h4>
+              <ul className="space-y-3">
+                {links.map(({ to, label }) => (
+                  <li key={to}>
+                    <Link to={to} className="text-purple-100 hover:text-white transition">
+                      {label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
 
           <div>
-            <h4 className="font-semibold mb-4">Resources</h4>
-            <ul className="space-y-2">
-              <li><Link to="/blog" className="hover:text-purple-200">Blog</Link></li>
-              <li><Link to="/webinars" className="hover:text-purple-200">Webinars</Link></li>
-              <li><Link to="/faq" className="hover:text-purple-200">FAQ</Link></li>
-              <li><Link to="/terms" className="hover:text-purple-200">Terms of Service</Link></li>
-            </ul>
-          </div>
-
-          <div>
-            <h4 className="font-semibold mb-4">Connect With Us</h4>
-            <div className="flex space-x-4">
-              <a href="#" className="hover:text-purple-200"><Facebook /></a>
-              <a href="#" className="hover:text-purple-200"><Twitter /></a>
-              <a href="#" className="hover:text-purple-200"><Instagram /></a>
-              <a href="#" className="hover:text-purple-200"><Linkedin /></a>
+            <h4 className="font-semibold text-xl mb-6 text-purple-200">Connect With Us</h4>
+            <div className="flex space-x-6">
+              {[Facebook, Twitter, Instagram, Linkedin].map((Icon, index) => (
+                <a key={index} href="#" className="text-purple-100 hover:text-white transition">
+                  <Icon className="w-6 h-6" />
+                </a>
+              ))}
             </div>
           </div>
         </div>
 
-        <div className="border-t border-purple-700 mt-8 pt-6 text-center">
-          <p>&copy; {currentYear} Tabula Rasa. All Rights Reserved.</p>
+        <div className="border-t border-purple-700/50 mt-12 pt-8 text-center">
+          <p className="text-purple-200">&copy; {currentYear} Tabula Rasa. All Rights Reserved.</p>
         </div>
       </div>
     </footer>
