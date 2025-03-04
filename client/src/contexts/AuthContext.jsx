@@ -1,5 +1,6 @@
 // src/contexts/AuthContext.jsx
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 const AuthContext = createContext();
 
@@ -7,6 +8,7 @@ export function AuthProvider({ children }) {
   const [currentUser, setCurrentUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
@@ -29,7 +31,6 @@ export function AuthProvider({ children }) {
   }, []);
 
   const isTokenValid = (token) => {
-    // Basic token validation (replace with proper JWT validation later)
     return token && token.length > 0;
   };
 
@@ -44,7 +45,6 @@ export function AuthProvider({ children }) {
       });
       
       const data = await response.json();
-      
       if (!response.ok) {
         setError(data.message || 'Login failed');
         throw new Error(data.message || 'Login failed');
@@ -53,7 +53,6 @@ export function AuthProvider({ children }) {
       setCurrentUser(data.user);
       localStorage.setItem('user', JSON.stringify(data.user));
       localStorage.setItem('token', data.token);
-      
       return data;
     } catch (error) {
       setError(error.message);
@@ -74,7 +73,6 @@ export function AuthProvider({ children }) {
       });
       
       const data = await response.json();
-      
       if (!response.ok) {
         setError(data.message || 'Signup failed');
         throw new Error(data.message || 'Signup failed');
@@ -83,7 +81,6 @@ export function AuthProvider({ children }) {
       setCurrentUser(data.user);
       localStorage.setItem('user', JSON.stringify(data.user));
       localStorage.setItem('token', data.token);
-      
       return data;
     } catch (error) {
       setError(error.message);
@@ -98,6 +95,7 @@ export function AuthProvider({ children }) {
     setError(null);
     localStorage.removeItem('user');
     localStorage.removeItem('token');
+    navigate('/login');
   };
 
   const value = {
