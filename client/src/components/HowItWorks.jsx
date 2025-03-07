@@ -52,15 +52,15 @@ const HowItWorks = () => {
   ];
 
   return (
-    <div className="relative w-full bg-[#0A0B18] text-white py-16 px-4 overflow-hidden">
+    <div className="relative w-full bg-[#0A0B18] text-white py-16 overflow-hidden">
       <motion.div
         variants={containerVariants}
         initial="hidden"
         whileInView="visible"
         viewport={{ once: true, amount: 0.2 }}
-        className="max-w-7xl mx-auto"
+        className="w-full px-4 sm:px-6 lg:px-8"
       >
-        <motion.div variants={itemVariants} className="text-center mb-16 px-4">
+        <motion.div variants={itemVariants} className="text-center mb-16">
           <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-6">How Tabula Rasa Works</h2>
           <p className="text-base sm:text-lg text-gray-300 max-w-3xl mx-auto">
             Our four-step system helps you master the PANCE through effective learning, practice, 
@@ -102,7 +102,7 @@ const HowItWorks = () => {
         initial="hidden"
         whileInView="visible"
         viewport={{ once: true }}
-        className="mt-20 border-t border-gray-800 pt-8"
+        className="mt-20 border-t border-gray-800 pt-8 px-4 sm:px-6 lg:px-8"
       >
       </motion.div>
     </div>
