@@ -43,7 +43,7 @@ const HeroSection = () => {
       {/* Purple gradient circle in top right */}
       <div className="absolute top-0 right-0 w-96 h-96 bg-purple-800 rounded-full opacity-30 blur-3xl -mr-20 -mt-20"></div>
 
-      <div className="w-full grid grid-cols-1 lg:grid-cols-2 gap-8 px-4 py-16">
+      <div className="w-full grid grid-cols-1 lg:grid-cols-2 gap-8 py-16">
         {/* Left Column - Main Content */}
         <motion.section
           variants={containerVariants}
@@ -204,11 +204,11 @@ const HeroSection = () => {
       {/* Bottom CTA banner with fixed position when scrolled */}
       {/* Using position fixed when scrolled, otherwise relative positioning */}
       <div 
-        className={`w-full bg-[#0a0318] py-6 px-4 sm:px-6 left-0 right-0 z-50 ${
+        className={`w-full bg-[#0a0318] py-6 left-0 right-0 z-50 ${
           isScrolled ? 'fixed bottom-0' : 'relative'
         }`}
       >
-        <div className="flex flex-col md:flex-row md:justify-between md:items-center max-w-7xl mx-auto">
+        <div className="flex flex-col md:flex-row md:justify-between md:items-center px-4 sm:px-6 lg:px-16">
           <div className="text-center md:text-left mb-4 md:mb-0">
             <h2 className="text-xl md:text-2xl font-bold">Transform your PANCE prep today</h2>
             <p className="text-gray-300">Special offer: 3 months free, then $16/month</p>

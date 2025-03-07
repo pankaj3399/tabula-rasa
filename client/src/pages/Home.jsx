@@ -8,9 +8,9 @@ import HowItWorks from '../components/HowItWorks';
 const Home = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 to-purple-100">
+      <HeroSection />
+      <HowItWorks />
       <div className="container mx-auto px-4">
-        <HeroSection />
-        <HowItWorks />
         <FeatureSection />
         <TestimonialSection />
         <CTASection />
