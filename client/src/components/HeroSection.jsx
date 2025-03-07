@@ -49,11 +49,11 @@ const HeroSection = () => {
           variants={containerVariants}
           initial="hidden"
           animate="visible"
-          className="flex flex-col justify-center px-6 lg:pl-16"
+          className="flex flex-col justify-center px-4 sm:px-6 lg:pl-16"
         >
           <motion.h1 
             variants={itemVariants}
-            className="text-4xl md:text-6xl font-bold mb-6 leading-tight"
+            className="text-3xl sm:text-4xl md:text-6xl font-bold mb-6 leading-tight text-center lg:text-left"
           >
             <span className="text-white">Next-Generation </span>
             <span className="text-indigo-400">PANCE & PANRE </span>
@@ -62,24 +62,24 @@ const HeroSection = () => {
 
           <motion.p
             variants={itemVariants}
-            className="text-lg text-gray-300 mb-8 max-w-xl"
+            className="text-base sm:text-lg text-gray-300 mb-8 max-w-xl mx-auto lg:mx-0 text-center lg:text-left"
           >
             The smarter approach to PA certification - adaptive learning, AI tutoring, and strategic practice for students and certified PAs alike.
           </motion.p>
 
           <motion.div
             variants={itemVariants}
-            className="flex flex-wrap gap-4 mb-8"
+            className="flex flex-col sm:flex-row gap-4 mb-8 w-full justify-center lg:justify-start"
           >
             <Link
               to="/signup"
-              className="bg-indigo-500 hover:bg-indigo-600 text-white px-8 py-4 rounded-lg transition-colors font-medium text-lg"
+              className="w-full sm:w-auto bg-indigo-500 hover:bg-indigo-600 text-white px-8 py-4 rounded-lg transition-colors font-medium text-lg text-center"
             >
               Start Your 3 Months
             </Link>
             <Link
               to="/demo"
-              className="bg-[#1A103B] hover:bg-[#251550] text-white px-8 py-4 rounded-lg border border-indigo-800 transition-colors font-medium text-lg"
+              className="w-full sm:w-auto bg-[#1A103B] hover:bg-[#251550] text-white px-8 py-4 rounded-lg border border-indigo-800 transition-colors font-medium text-lg text-center"
             >
               Watch Demo
             </Link>
@@ -87,7 +87,7 @@ const HeroSection = () => {
 
           <motion.div
             variants={itemVariants}
-            className="inline-block"
+            className="flex justify-center lg:justify-start"
           >
             <div className="bg-purple-800 text-white px-5 py-3 rounded-full text-sm font-medium">
               Special Offer: 3 months free, then $16/month
@@ -96,7 +96,7 @@ const HeroSection = () => {
 
           <motion.div
             variants={itemVariants}
-            className="mt-16"
+            className="mt-16 text-center lg:text-left"
           >
             <h2 className="text-2xl font-bold mb-4">Transform your PANCE prep today</h2>
             <p className="text-gray-300">Special offer: 3 months free, then $16/month</p>
@@ -108,7 +108,7 @@ const HeroSection = () => {
           variants={containerVariants}
           initial="hidden"
           animate="visible"
-          className="flex items-center justify-center px-6 lg:pr-16"
+          className="flex items-center justify-center px-4 sm:px-6 lg:pr-16"
         >
           <motion.div 
             variants={itemVariants}
@@ -116,7 +116,7 @@ const HeroSection = () => {
           >
             {/* Card Header */}
             <div className="bg-gradient-to-r from-indigo-500 to-purple-600 h-2"></div>
-            <div className="p-6">
+            <div className="p-4 sm:p-6">
               <div className="flex items-center gap-4 mb-4">
                 <svg className="w-8 h-8" viewBox="0 0 24 24" fill="#6366F1">
                   <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z" />
@@ -139,11 +139,11 @@ const HeroSection = () => {
               <div className="bg-purple-700 rounded-lg p-4 mb-4">
                 <p className="font-bold mb-2">Alfred: Let me break down the key differences with this clinical decision-making table:</p>
                 
-                <p className="font-medium mb-2">Clinical Decision-Making Table: Differentiating Between Hypertrophic Cardiomyopathy (HCM) and Dilated Cardiomyopathy (DCM)</p>
+                <p className="font-medium mb-2 text-sm sm:text-base">Clinical Decision-Making Table: Differentiating Between Hypertrophic Cardiomyopathy (HCM) and Dilated Cardiomyopathy (DCM)</p>
                 
                 {/* Table - Updated with all rows from the image */}
-                <div className="overflow-x-auto">
-                  <table className="w-full border-collapse text-sm">
+                <div className="overflow-x-auto -mx-4 sm:mx-0">
+                  <table className="w-full border-collapse text-xs sm:text-sm">
                     <thead>
                       <tr className="bg-purple-800 text-white">
                         <th className="p-2 text-left">Feature</th>
@@ -204,18 +204,18 @@ const HeroSection = () => {
       {/* Bottom CTA banner with fixed position when scrolled */}
       {/* Using position fixed when scrolled, otherwise relative positioning */}
       <div 
-        className={`w-full bg-[#0a0318] py-6 px-6 left-0 right-0 z-50 ${
+        className={`w-full bg-[#0a0318] py-6 px-4 sm:px-6 left-0 right-0 z-50 ${
           isScrolled ? 'fixed bottom-0' : 'relative'
         }`}
       >
         <div className="flex flex-col md:flex-row md:justify-between md:items-center max-w-7xl mx-auto">
-          <div>
-            <h2 className="text-2xl font-bold">Transform your PANCE prep today</h2>
+          <div className="text-center md:text-left mb-4 md:mb-0">
+            <h2 className="text-xl md:text-2xl font-bold">Transform your PANCE prep today</h2>
             <p className="text-gray-300">Special offer: 3 months free, then $16/month</p>
           </div>
           <Link
             to="/signup"
-            className="bg-indigo-500 hover:bg-indigo-600 text-white px-8 py-4 rounded-lg transition-colors font-medium text-lg mt-4 md:mt-0 inline-block"
+            className="bg-indigo-500 hover:bg-indigo-600 text-white px-6 md:px-8 py-3 md:py-4 rounded-lg transition-colors font-medium text-base md:text-lg w-full md:w-auto text-center"
           >
             Start Your 3 Months
           </Link>

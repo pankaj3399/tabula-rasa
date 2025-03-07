@@ -60,9 +60,9 @@ const HowItWorks = () => {
         viewport={{ once: true, amount: 0.2 }}
         className="max-w-7xl mx-auto"
       >
-        <motion.div variants={itemVariants} className="text-center mb-16">
-          <h2 className="text-4xl md:text-5xl font-bold mb-6">How Tabula Rasa Works</h2>
-          <p className="text-lg text-gray-300 max-w-3xl mx-auto">
+        <motion.div variants={itemVariants} className="text-center mb-16 px-4">
+          <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-6">How Tabula Rasa Works</h2>
+          <p className="text-base sm:text-lg text-gray-300 max-w-3xl mx-auto">
             Our four-step system helps you master the PANCE through effective learning, practice, 
             reinforcement, and test fitness
           </p>
@@ -70,13 +70,13 @@ const HowItWorks = () => {
 
         <motion.div 
           variants={containerVariants}
-          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mt-12"
+          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 gap-y-12 mt-12"
         >
           {steps.map((step, index) => (
             <motion.div
               key={index}
               variants={itemVariants}
-              className="flex flex-col items-center text-center"
+              className="flex flex-col items-center text-center px-4"
             >
               <div className="w-20 h-20 bg-purple-700 rounded-full flex items-center justify-center mb-6">
                 <span className="text-3xl font-bold">{step.number}</span>
@@ -88,7 +88,7 @@ const HowItWorks = () => {
                 {step.icon}
               </div>
               
-              <p className="text-gray-300">
+              <p className="text-gray-300 max-w-xs mx-auto">
                 {step.description}
               </p>
             </motion.div>
@@ -104,7 +104,6 @@ const HowItWorks = () => {
         viewport={{ once: true }}
         className="mt-20 border-t border-gray-800 pt-8"
       >
-
       </motion.div>
     </div>
   );
