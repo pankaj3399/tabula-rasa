@@ -31,56 +31,79 @@ const Login = () => {
     }
   };
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-indigo-50 to-blue-50 flex items-center justify-center px-4 relative overflow-hidden">
-      {/* Background Effects */}
-      <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute top-0 left-0 w-64 h-64 bg-purple-200 rounded-full opacity-20 blur-3xl animate-blob"></div>
-        <div className="absolute bottom-0 right-0 w-72 h-72 bg-indigo-200 rounded-full opacity-20 blur-3xl animate-blob animation-delay-2000"></div>
-      </div>
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.2,
+        delayChildren: 0.3,
+      },
+    },
+  };
 
+  const itemVariants = {
+    hidden: { opacity: 0, y: 30 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: { duration: 0.6, ease: 'easeOut' },
+    },
+  };
+
+  return (
+    <div className="min-h-screen bg-[#0E0526] text-white flex items-center justify-center px-4 relative overflow-hidden">
+      {/* Background Effects */}
+      <div className="absolute top-0 right-0 w-96 h-96 bg-purple-800 rounded-full opacity-30 blur-3xl -mr-20 -mt-20"></div>
+      <div className="absolute bottom-0 left-0 w-96 h-96 bg-indigo-800 rounded-full opacity-20 blur-3xl -ml-20 -mb-20"></div>
+      
       <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.6, ease: 'easeOut' }}
-        className="bg-white/90 backdrop-blur-md shadow-2xl rounded-2xl p-8 w-full max-w-md border border-purple-100 relative z-10"
+        variants={containerVariants}
+        initial="hidden"
+        animate="visible"
+        className="bg-[#1A103B] border border-indigo-900 shadow-2xl rounded-lg p-8 w-full max-w-md relative z-10"
       >
-        <div className="text-center mb-8">
-          <h2 className="text-4xl font-bold text-purple-800 flex items-center justify-center">
-            <LogIn className="mr-3 w-8 h-8" /> Login
-          </h2>
-          <p className="text-gray-600 mt-3 text-lg">
-            Welcome Back to Tabula Rasa
+        <div className="bg-gradient-to-r from-indigo-500 to-purple-600 h-2 absolute top-0 left-0 right-0 rounded-t-lg"></div>
+        
+        <motion.div variants={itemVariants} className="text-center mb-8">
+          <div className="flex items-center justify-center mb-4">
+            <svg className="w-10 h-10" viewBox="0 0 24 24" fill="#6366F1">
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z" />
+              <path d="M12 6c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6-2.69-6-6-6zm0 10c-2.21 0-4-1.79-4-4s1.79-4 4-4 4 1.79 4 4-1.79 4-4 4z" />
+            </svg>
+          </div>
+          <h2 className="text-3xl font-bold text-white mb-2">Welcome Back</h2>
+          <p className="text-gray-300 text-lg">
+            Log in to your Tabula Rasa account
           </p>
-        </div>
+        </motion.div>
 
         {error && (
           <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6 flex items-center shadow-sm"
+            variants={itemVariants}
+            className="bg-red-900/30 border border-red-800 text-red-200 px-4 py-3 rounded-lg mb-6 flex items-center"
           >
-            <AlertCircle className="mr-2 text-red-500 w-5 h-5" />
+            <AlertCircle className="mr-2 text-red-400 w-5 h-5" />
             {error}
           </motion.div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <motion.form variants={itemVariants} onSubmit={handleSubmit} className="space-y-6">
           {[
             { id: 'email', label: 'Email Address', value: email, setValue: setEmail, Icon: Mail, placeholder: 'Enter your email', type: 'email' },
             { id: 'password', label: 'Password', value: password, setValue: setPassword, Icon: Lock, placeholder: 'Enter your password', type: 'password' },
           ].map(({ id, label, value, setValue, Icon, placeholder, type }) => (
             <div key={id}>
-              <label htmlFor={id} className="block text-gray-700 font-medium mb-2">{label}</label>
+              <label htmlFor={id} className="block text-gray-300 font-medium mb-2">{label}</label>
               <div className="relative">
-                <Icon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <Icon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-indigo-400 w-5 h-5" />
                 <input
                   type={type}
                   id={id}
                   value={value}
                   onChange={(e) => setValue(e.target.value)}
                   placeholder={placeholder}
-                  className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-transparent bg-white/50 transition-all shadow-sm"
+                  className="w-full pl-10 pr-4 py-3 bg-[#121520] border border-indigo-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
                   required
                 />
               </div>
@@ -90,7 +113,7 @@ const Login = () => {
           <div className="text-right">
             <Link
               to="/forgot-password"
-              className="text-sm text-purple-600 hover:text-purple-800 font-medium transition"
+              className="text-sm text-indigo-400 hover:text-indigo-300 font-medium transition"
             >
               Forgot Password?
             </Link>
@@ -101,18 +124,24 @@ const Login = () => {
             whileTap={{ scale: 0.98 }}
             type="submit"
             disabled={loading}
-            className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white py-3 rounded-lg hover:from-purple-700 hover:to-indigo-700 transition-all flex items-center justify-center font-semibold shadow-md disabled:opacity-70 disabled:cursor-not-allowed"
+            className="w-full bg-indigo-500 hover:bg-indigo-600 text-white py-3 rounded-lg transition-all flex items-center justify-center font-medium text-lg disabled:opacity-70 disabled:cursor-not-allowed"
           >
             {loading ? 'Logging in...' : 'Login'}
           </motion.button>
-        </form>
+        </motion.form>
 
-        <div className="text-center mt-6 text-gray-600">
-          Don’t have an account?{' '}
-          <Link to="/signup" className="text-purple-600 hover:text-purple-800 font-medium transition">
+        <motion.div variants={itemVariants} className="text-center mt-8 text-gray-300">
+          Don't have an account?{' '}
+          <Link to="/signup" className="text-indigo-400 hover:text-indigo-300 font-medium transition">
             Sign Up
           </Link>
-        </div>
+        </motion.div>
+        
+        <motion.div variants={itemVariants} className="mt-8 text-center">
+          <div className="bg-purple-800 text-white px-5 py-3 rounded-full text-sm font-medium inline-block">
+            Special Offer: 3 months free, then $16/month
+          </div>
+        </motion.div>
       </motion.div>
     </div>
   );
