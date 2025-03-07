@@ -104,20 +104,7 @@ const HowItWorks = () => {
         viewport={{ once: true }}
         className="mt-20 border-t border-gray-800 pt-8"
       >
-        <div className="flex flex-col md:flex-row md:justify-between md:items-center max-w-7xl mx-auto">
-          <motion.div variants={itemVariants}>
-            <h3 className="text-2xl font-bold">Transform your PANCE prep today</h3>
-            <p className="text-gray-300">Special offer: 3 months free, then $16/month</p>
-          </motion.div>
-          <motion.div variants={itemVariants} className="mt-4 md:mt-0">
-            <Link
-              to="/signup"
-              className="bg-indigo-500 hover:bg-indigo-600 text-white px-8 py-4 rounded-lg transition-colors font-medium text-lg inline-block"
-            >
-              Start Your 3 Months
-            </Link>
-          </motion.div>
-        </div>
+
       </motion.div>
     </div>
   );
