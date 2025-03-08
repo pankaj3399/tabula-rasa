@@ -55,13 +55,11 @@ const FAQSection = () => {
                 )}
               </button>
 
-              <div
-                className={`p-4 bg-white dark:bg-gray-900 border-t dark:border-gray-700 accordion-content ${
-                  activeAccordion === index ? 'active' : ''
-                }`}
-              >
-                <p className="text-gray-600 dark:text-gray-300">{item.answer}</p>
-              </div>
+              {activeAccordion === index && (
+                <div className="p-4 bg-white dark:bg-gray-900 border-t dark:border-gray-700">
+                  <p className="text-gray-600 dark:text-gray-300">{item.answer}</p>
+                </div>
+              )}
             </div>
           ))}
         </div>
