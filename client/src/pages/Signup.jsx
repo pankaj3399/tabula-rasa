@@ -1,4 +1,3 @@
-// src/pages/Signup.jsx
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -31,7 +30,7 @@ const Signup = () => {
       setLoading(false);
     }
   };
-  
+
   const containerVariants = {
     hidden: { opacity: 0 },
     visible: {
@@ -54,7 +53,6 @@ const Signup = () => {
 
   return (
     <div className="min-h-screen bg-[#0E0526] text-white flex items-center justify-center px-4 relative overflow-hidden">
-      {/* Background Effects */}
       <div className="absolute top-0 right-0 w-96 h-96 bg-purple-800 rounded-full opacity-30 blur-3xl -mr-20 -mt-20"></div>
       <div className="absolute bottom-0 left-0 w-96 h-96 bg-indigo-800 rounded-full opacity-20 blur-3xl -ml-20 -mb-20"></div>
       
@@ -90,7 +88,7 @@ const Signup = () => {
         )}
 
         <motion.form variants={itemVariants} onSubmit={handleSubmit} className="space-y-6">
-          {[ 
+          {[
             { id: 'name', label: 'Full Name', value: name, setValue: setName, Icon: User, placeholder: 'Enter your name' },
             { id: 'email', label: 'Email Address', value: email, setValue: setEmail, Icon: Mail, placeholder: 'Enter your email', type: 'email' },
             { id: 'password', label: 'Password', value: password, setValue: setPassword, Icon: Lock, placeholder: 'Create a password', type: 'password' },

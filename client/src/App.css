@@ -1,0 +1,67 @@
+/* Dark mode support */
+.dark {
+    color-scheme: dark;
+  }
+  
+  .dark body,
+  .dark .bg-white {
+    background-color: #181818;
+    color: #f3f4f6;
+  }
+  
+  .dark .dark\:bg-gray-900 {
+    background-color: #111111;
+  }
+  
+  .dark .dark\:bg-gray-800 {
+    background-color: #1f1f1f;
+  }
+  
+  .dark .dark\:text-white {
+    color: #ffffff;
+  }
+  
+  .dark .dark\:text-gray-300 {
+    color: #d1d5db;
+  }
+  
+  .dark .dark\:text-gray-400 {
+    color: #9ca3af;
+  }
+  
+  .dark .dark\:border-gray-700 {
+    border-color: #374151;
+  }
+  
+  /* Transition animations */
+  .fade-in {
+    animation: fadeIn 0.3s ease-in-out;
+  }
+  
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  
+  /* Tab content transitions */
+  .tab-content {
+    display: none;
+    opacity: 0;
+    transition: opacity 0.3s ease-in-out;
+  }
+  
+  .tab-content.active {
+    display: block;
+    opacity: 1;
+  }
+  
+  /* Accordion animations */
+  .accordion-content {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease-out;
+  }
+  
+  .accordion-content.active {
+    max-height: 500px;
+  }

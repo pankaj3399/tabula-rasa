@@ -1,6 +1,5 @@
-// src/contexts/AuthContext.jsx
+// client/src/contexts/AuthContext.jsx
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 
 const AuthContext = createContext();
 
@@ -8,7 +7,6 @@ export function AuthProvider({ children }) {
   const [currentUser, setCurrentUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const navigate = useNavigate();
 
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
@@ -38,14 +36,17 @@ export function AuthProvider({ children }) {
     setError(null);
     setLoading(true);
     try {
+      console.log('Login request data:', { email, password });
+      console.log('API URL:', `${import.meta.env.VITE_API_URL}/auth/login`);
       const response = await fetch(`${import.meta.env.VITE_API_URL}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
+        body: JSON.stringify({ email, password }),
       });
       
       const data = await response.json();
       if (!response.ok) {
+        console.error('Login failed:', data);
         setError(data.message || 'Login failed');
         throw new Error(data.message || 'Login failed');
       }
@@ -55,7 +56,8 @@ export function AuthProvider({ children }) {
       localStorage.setItem('token', data.token);
       return data;
     } catch (error) {
-      setError(error.message);
+      console.error('Login error:', error);
+      setError(error.message || 'Failed to fetch');
       throw error;
     } finally {
       setLoading(false);
@@ -66,14 +68,17 @@ export function AuthProvider({ children }) {
     setError(null);
     setLoading(true);
     try {
+      console.log('Signup request data:', { email, password, name });
+      console.log('API URL:', `${import.meta.env.VITE_API_URL}/auth/signup`);
       const response = await fetch(`${import.meta.env.VITE_API_URL}/auth/signup`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, name })
+        body: JSON.stringify({ email, password, name }),
       });
       
       const data = await response.json();
       if (!response.ok) {
+        console.error('Signup failed:', data);
         setError(data.message || 'Signup failed');
         throw new Error(data.message || 'Signup failed');
       }
@@ -83,7 +88,8 @@ export function AuthProvider({ children }) {
       localStorage.setItem('token', data.token);
       return data;
     } catch (error) {
-      setError(error.message);
+      console.error('Signup error:', error);
+      setError(error.message || 'Failed to fetch');
       throw error;
     } finally {
       setLoading(false);
@@ -95,7 +101,6 @@ export function AuthProvider({ children }) {
     setError(null);
     localStorage.removeItem('user');
     localStorage.removeItem('token');
-    navigate('/login');
   };
 
   const value = {
