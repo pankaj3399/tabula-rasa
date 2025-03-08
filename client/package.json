@@ -10,6 +10,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@stripe/react-stripe-js": "^3.3.0",
+    "@stripe/stripe-js": "^5.10.0",
     "@tailwindcss/vite": "^4.0.9",
     "framer-motion": "^12.4.10",
     "lucide-react": "^0.475.0",
