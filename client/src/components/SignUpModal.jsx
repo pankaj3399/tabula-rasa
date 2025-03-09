@@ -1,4 +1,3 @@
-// client/src/components/SignUpModal.jsx
 import React, { useState } from 'react';
 import { Brain, X, Search } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
@@ -70,7 +69,8 @@ const SignUpModal = ({ closeModal, setShowDashboard }) => {
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-gray-800 rounded-lg max-w-md w-full p-6 relative">
+      {/* The main change: Added max-h-[90vh] and overflow-y-auto to make the modal scrollable */}
+      <div className="bg-white dark:bg-gray-800 rounded-lg max-w-md w-full p-6 relative max-h-[90vh] overflow-y-auto">
         <button
           onClick={closeModal}
           className="absolute top-4 right-4 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
