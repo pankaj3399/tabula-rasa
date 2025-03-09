@@ -1,1 +1,32 @@
 @import "tailwindcss";
+
+/* Base typography improvements for all screens */
+html {
+  font-size: 100%; /* Base font size */
+}
+
+/* Responsive typography adjustments */
+@media screen and (min-width: 768px) {
+  html {
+    font-size: 112.5%; /* Increased base size for larger screens (18px if base was 16px) */
+  }
+}
+
+@media screen and (min-width: 1280px) {
+  html {
+    font-size: 118.75%; /* Further increased for very large screens (19px if base was 16px) */
+  }
+}
+
+/* Ensure text doesn't appear too large on extra large monitors */
+@media screen and (min-width: 1800px) {
+  html {
+    font-size: 125%; /* 20px if base was 16px */
+  }
+}
+
+/* Improve readability with better line height and spacing */
+body {
+  line-height: 1.6;
+  text-rendering: optimizeLegibility;
+}
