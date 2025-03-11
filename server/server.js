@@ -3,6 +3,7 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const authRoutes = require('./routes/authRoutes');
+const knowledgeMapRoutes = require('./routes/knowledgeMapRoutes');
 require('dotenv').config();
 
 const app = express();
@@ -24,6 +25,7 @@ mongoose.connect(process.env.MONGO_URI, {
 
 // Routes
 app.use('/api/auth', authRoutes);
+app.use('/api', knowledgeMapRoutes);
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {

@@ -5,19 +5,22 @@ import axios from 'axios';
 import Header from '../components/Header';
 
 const SubtopicContent = ({ darkMode, setDarkMode }) => {
-  const { subtopicId } = useParams();
+  const { id } = useParams();
   const [subtopic, setSubtopic] = useState(null);
   const [notes, setNotes] = useState('');
+  const [activePage, setActivePage] = useState('Page 1');
 
   useEffect(() => {
+    // Fetch subtopic content from backend
     axios
-      .get(`http://localhost:1337/api/subtopics/${subtopicId}?populate=*`)
+      .get(`http://localhost:3000/api/subtopic-content/${id}`)
       .then(response => {
-        setSubtopic(response.data.data);
-        setNotes(response.data.data.attributes.notes || '');
+        const data = response.data.data;
+        setSubtopic(data);
+        setNotes(data.attributes.notes || '');
       })
-      .catch(error => console.error('Error fetching subtopic:', error));
-  }, [subtopicId]);
+      .catch(error => console.error('Error fetching subtopic content:', error));
+  }, [id]);
 
   const handleNotesChange = e => {
     setNotes(e.target.value);
@@ -25,8 +28,8 @@ const SubtopicContent = ({ darkMode, setDarkMode }) => {
 
   const saveNotes = async () => {
     try {
-      await axios.put(`http://localhost:1337/api/subtopics/${subtopicId}`, {
-        data: { notes },
+      await axios.put(`http://localhost:3000/api/subtopic-content/${id}`, {
+        notes,
       });
       alert('Notes saved successfully!');
     } catch (error) {
@@ -35,45 +38,75 @@ const SubtopicContent = ({ darkMode, setDarkMode }) => {
     }
   };
 
-  if (!subtopic) return <div>Loading...</div>;
+  if (!subtopic) return <div className="text-center py-10 text-white">Loading...</div>;
 
   return (
-    <div className="min-h-screen bg-white dark:bg-gray-900">
+    <div className="min-h-screen bg-gray-900 text-white">
       <Header darkMode={darkMode} setDarkMode={setDarkMode} />
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="flex items-center justify-between">
-          <Link to="/knowledge-map" className="text-blue-600 hover:underline">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <div className="flex justify-between items-center mb-6">
+          <Link to="/knowledge-map" className="text-blue-400 hover:underline">
             ← Back to Mind Map
           </Link>
-          <button className="bg-purple-600 text-white px-4 py-2 rounded-md">Hippocampus Hustle</button>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
-          <div className="bg-gray-800 text-white p-6 rounded-lg">
-            <h2 className="text-xl font-bold">{subtopic.attributes.topic?.data.attributes.name}</h2>
-            {subtopic.attributes.content && (
-              <div
-                className="mt-4 prose prose-invert"
-                dangerouslySetInnerHTML={{ __html: subtopic.attributes.content }}
-              />
-            )}
-          </div>
-          <div className="bg-gray-800 text-white p-6 rounded-lg">
-            <h2 className="text-xl font-bold">Notes</h2>
-            <div className="mt-4">
-              <button className="bg-purple-600 text-white px-4 py-2 rounded-md mb-4">Page 1</button>
-              <textarea
-                className="w-full h-64 p-3 bg-gray-700 text-white rounded-md"
-                value={notes}
-                onChange={handleNotesChange}
-                placeholder="Enter your notes here..."
-              />
-              <button
-                onClick={saveNotes}
-                className="mt-4 bg-purple-600 text-white px-4 py-2 rounded-md"
+          <div className="flex items-center space-x-2">
+            <span className="text-gray-400">Tabula Rasa</span>
+            <button className="bg-purple-600 text-white px-4 py-2 rounded-md flex items-center">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-5 w-5 mr-2"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
               >
-                Save Notes
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M13 10V3L4 14h7v7l9-11h-7z"
+                />
+              </svg>
+              Hippocampus Hustle
+            </button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="bg-gray-800 p-6 rounded-lg">
+            <h2 className="text-xl font-bold mb-4">{subtopic.attributes.topic?.data.attributes.name}</h2>
+            <h3 className="text-lg font-semibold mb-2">{subtopic.attributes.name}</h3>
+            {/* Placeholder for image - replace with actual image from Strapi if available */}
+            <img
+              src="https://via.placeholder.com/400x300?text=Heart+Anatomy"
+              alt="Heart Anatomy"
+              className="w-full h-48 object-cover rounded-md mb-4"
+            />
+            <p className="text-gray-300">
+              {subtopic.attributes.content || 'Understanding the normal heart structure is crucial for comprehending...'}
+            </p>
+          </div>
+
+          <div className="bg-gray-800 p-6 rounded-lg">
+            <h2 className="text-xl font-bold mb-4">Notes</h2>
+            <div className="flex justify-between items-center mb-4">
+              <button className="bg-purple-600 text-white px-4 py-2 rounded-md">
+                {activePage}
+              </button>
+              <button className="text-gray-400 border border-gray-600 px-4 py-2 rounded-md">
+                Add Page
               </button>
             </div>
+            <textarea
+              className="w-full h-64 p-3 bg-gray-700 text-white rounded-md focus:outline-none focus:ring-2 focus:ring-purple-600"
+              value={notes}
+              onChange={handleNotesChange}
+              placeholder="Enter your notes here..."
+            />
+            <button
+              onClick={saveNotes}
+              className="mt-4 bg-purple-600 text-white px-4 py-2 rounded-md w-full"
+            >
+              Save Notes
+            </button>
           </div>
         </div>
       </div>
