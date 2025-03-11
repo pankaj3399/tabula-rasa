@@ -10,7 +10,7 @@ const Header = ({ openSignUpModal, openLoginModal, darkMode, setDarkMode }) => {
 
   const handleLogout = async () => {
     try {
-      await logout(); // This already redirects to '/' via AuthContext
+      await logout();
     } catch (err) {
       console.error('Failed to log out:', err);
     }
@@ -22,7 +22,7 @@ const Header = ({ openSignUpModal, openLoginModal, darkMode, setDarkMode }) => {
         <div className="flex justify-between items-center">
           <div className="flex items-center space-x-2">
             <Brain className="h-6 w-6 text-purple-600" />
-            <Link to={currentUser ? '/dashboard' : '/'} className="text-xl sm:text-2xl font-bold text-gray-900">
+            <Link to={currentUser ? '/dashboard' : '/'} className="text-xl font-bold text-gray-900">
               Tabula Rasa
             </Link>
           </div>
@@ -33,40 +33,40 @@ const Header = ({ openSignUpModal, openLoginModal, darkMode, setDarkMode }) => {
                 <nav className="hidden md:flex items-center space-x-1">
                   <Link
                     to="/dashboard"
-                    className={`px-3 py-2 text-gray-600 hover:bg-gray-100 rounded-md flex items-center ${
+                    className={`px-3 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-md flex items-center ${
                       location.pathname === '/dashboard' ? 'bg-purple-100 text-purple-600' : ''
                     }`}
                   >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
                       <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" />
                     </svg>
                     Home
                   </Link>
                   <Link
                     to="/knowledge-map"
-                    className={`px-3 py-2 text-gray-600 hover:bg-gray-100 rounded-md flex items-center ${
+                    className={`px-3 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-md flex items-center ${
                       location.pathname === '/knowledge-map' ? 'bg-gray-100' : ''
                     }`}
                   >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
                     </svg>
                     Knowledge Map
                   </Link>
                   <Link
                     to="/synaptic-sprint"
-                    className="opacity-50 cursor-not-allowed px-3 py-2 text-gray-600 rounded-md flex items-center"
+                    className="opacity-50 cursor-not-allowed px-3 py-2 text-sm text-gray-600 rounded-md flex items-center"
                   >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                     </svg>
                     Synaptic Sprint Practice
                   </Link>
                   <Link
                     to="/calendar"
-                    className="opacity-50 cursor-not-allowed px-3 py-2 text-gray-600 rounded-md flex items-center"
+                    className="opacity-50 cursor-not-allowed px-3 py-2 text-sm text-gray-600 rounded-md flex items-center"
                   >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                     </svg>
                     Calendar
@@ -77,19 +77,19 @@ const Header = ({ openSignUpModal, openLoginModal, darkMode, setDarkMode }) => {
                   <input
                     type="text"
                     placeholder="Search topics..."
-                    className="pl-8 pr-3 py-2 border rounded-md"
+                    className="pl-8 pr-3 py-1.5 text-sm border rounded-md w-48 lg:w-64"
                   />
-                  <Search className="h-4 w-4 text-gray-400 absolute left-2 top-3" />
+                  <Search className="h-4 w-4 text-gray-400 absolute left-2 top-2" />
                 </div>
                 
                 <button
                   onClick={() => setDarkMode(!darkMode)}
-                  className="p-2 rounded-full text-gray-500 hover:bg-gray-100"
+                  className="p-1.5 rounded-full text-gray-500 hover:bg-gray-100"
                 >
                   {darkMode ? (
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
-                      className="h-5 w-5"
+                      className="h-4 w-4"
                       fill="none"
                       viewBox="0 0 24 24"
                       stroke="currentColor"
@@ -104,7 +104,7 @@ const Header = ({ openSignUpModal, openLoginModal, darkMode, setDarkMode }) => {
                   ) : (
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
-                      className="h-5 w-5"
+                      className="h-4 w-4"
                       fill="none"
                       viewBox="0 0 24 24"
                       stroke="currentColor"
@@ -119,49 +119,49 @@ const Header = ({ openSignUpModal, openLoginModal, darkMode, setDarkMode }) => {
                   )}
                 </button>
                 
-                <button className="p-2 rounded-full text-gray-500 hover:bg-gray-100 hidden md:block">
-                  <Settings className="h-5 w-5" />
+                <button className="p-1.5 rounded-full text-gray-500 hover:bg-gray-100 hidden md:block">
+                  <Settings className="h-4 w-4" />
                 </button>
                 
                 <button
                   onClick={handleLogout}
-                  className="p-2 rounded-full text-gray-500 hover:bg-gray-100 hidden md:block"
+                  className="p-1.5 rounded-full text-gray-500 hover:bg-gray-100 hidden md:block"
                 >
-                  <LogOut className="h-5 w-5" />
+                  <LogOut className="h-4 w-4" />
                 </button>
                 
                 <Link
                   to="/profile"
-                  className="bg-purple-600 text-white px-4 py-2 rounded-md"
+                  className="bg-purple-600 text-white text-sm px-4 py-1.5 rounded-md"
                 >
                   My Profile
                 </Link>
               </>
             ) : (
               <>
-                <button className="hidden md:inline-flex px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-md">About</button>
-                <button className="hidden md:inline-flex px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-md">Features</button>
-                <button className="hidden md:inline-flex px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-md">Pricing</button>
+                <button className="hidden md:inline-flex text-sm px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-md">About</button>
+                <button className="hidden md:inline-flex text-sm px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-md">Features</button>
+                <button className="hidden md:inline-flex text-sm px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-md">Pricing</button>
                 <button
                   onClick={openLoginModal}
-                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50"
+                  className="text-sm px-4 py-1.5 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50"
                 >
                   Login
                 </button>
                 <button
                   onClick={openSignUpModal}
-                  className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-md"
+                  className="text-sm px-4 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-md"
                 >
                   Sign Up
                 </button>
                 <button
                   onClick={() => setDarkMode(!darkMode)}
-                  className="p-2 rounded-full text-gray-500 hover:bg-gray-100"
+                  className="p-1.5 rounded-full text-gray-500 hover:bg-gray-100"
                 >
                   {darkMode ? (
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
-                      className="h-5 w-5"
+                      className="h-4 w-4"
                       fill="none"
                       viewBox="0 0 24 24"
                       stroke="currentColor"
@@ -176,7 +176,7 @@ const Header = ({ openSignUpModal, openLoginModal, darkMode, setDarkMode }) => {
                   ) : (
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
-                      className="h-5 w-5"
+                      className="h-4 w-4"
                       fill="none"
                       viewBox="0 0 24 24"
                       stroke="currentColor"

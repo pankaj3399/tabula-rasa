@@ -8,15 +8,17 @@ import TodaysSchedule from '../components/TodaysSchedule';
 import QuickActions from '../components/QuickActions';
 import UpcomingTests from '../components/UpcomingTests';
 import PANCEBlueprintProgress from '../components/PANCEBlueprintProgress';
-import RecommendedTopics from '../components/RecommendedTopics'; // You'll need to create this component
+import RecommendedTopics from '../components/RecommendedTopics';
 
 const Dashboard = ({ darkMode, setDarkMode }) => {
   return (
     <div className="min-h-screen bg-white">
       <Header darkMode={darkMode} setDarkMode={setDarkMode} />
-      <div className="container mx-auto px-4 max-w-7xl py-6">
+      <div className="container mx-auto px-4 max-w-7xl py-4">
         <WelcomeSection />
-        <StudyPlan />
+        <div className="mt-4">
+          <StudyPlan />
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
           <ContinueLearning />
           <TodaysSchedule />
