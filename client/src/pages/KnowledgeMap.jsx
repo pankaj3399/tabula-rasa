@@ -1,4 +1,3 @@
-// client/src/pages/KnowledgeMap.jsx
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
@@ -9,15 +8,32 @@ const KnowledgeMap = ({ darkMode, setDarkMode }) => {
   const [expandedSystems, setExpandedSystems] = useState({});
 
   useEffect(() => {
-    // Fetch systems data with nested topics and subtopics from backend
+    // Fetch systems data (mapped from Strapi Topics) with nested subtopics
     axios
       .get('http://localhost:3000/api/knowledge-map')
       .then(response => {
-        setSystems(response.data.data);
+        // Map Strapi's Topic data to the UI's expected "systems" structure
+        const mappedSystems = response.data.data.map(topic => ({
+          id: topic.id,
+          attributes: {
+            name: topic.attributes.title, // Map Strapi's title to system name
+            percentage: topic.attributes.percentage || 10, // Use percentage if added, else mock
+            topics: {
+              data: topic.attributes.subtopics.data.map(subtopic => ({
+                id: subtopic.id,
+                attributes: {
+                  name: subtopic.attributes.title, // Map subtopic title to topic name
+                },
+              })),
+            },
+          },
+        }));
+
+        setSystems(mappedSystems);
 
         // Initially expand all systems for better visibility
         const initialExpanded = {};
-        response.data.data.forEach(system => {
+        mappedSystems.forEach(system => {
           initialExpanded[system.id] = true;
         });
         setExpandedSystems(initialExpanded);
@@ -35,18 +51,8 @@ const KnowledgeMap = ({ darkMode, setDarkMode }) => {
   // Function to determine icon based on system name
   const getSystemIcon = (systemName) => {
     const icons = {
-      'Cardiovascular System': '❤️',
-      'Pulmonary System': '🫁',
-      'Gastrointestinal System/Nutrition': '☕',
-      'Musculoskeletal System': '💪',
-      'Infectious Diseases': '🛡️',
-      'Neurologic System': '🧠',
-      'Psychiatry/Behavioral Science': '😊',
-      'Reproductive System': '👥',
-      'Endocrine System': '💉',
-      'Eyes, Ears, Nose, and Throat': '👁️',
-      'Hematologic System': '💧',
-      'Renal System': '🧪',
+      'Cardiomyopathies': '❤️', // Map to match sample data
+      'Hypertension': '🩺',     // Custom icon for Hypertension
     };
     return icons[systemName] || '🔬'; // Default icon if not found
   };
@@ -108,7 +114,7 @@ const KnowledgeMap = ({ darkMode, setDarkMode }) => {
                 {system.attributes.topics?.data.map(topic => (
                   <Link
                     key={topic.id}
-                    to={`/knowledge-map/topic/${topic.id}`}
+                    to={`/subtopic-content/${topic.id}`} // Update route to match SubtopicContent.jsx
                     className="flex items-center justify-between p-3 bg-white border border-gray-200 rounded-md hover:bg-gray-50 transition-colors"
                   >
                     <span className="text-gray-800 text-sm">{topic.attributes.name}</span>

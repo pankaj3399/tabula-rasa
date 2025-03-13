@@ -28,6 +28,9 @@
       "relation": "manyToOne",
       "target": "api::subtopic.subtopic",
       "inversedBy": "topic"
+    },
+    "percentage": {
+      "type": "integer"
     }
   }
 }

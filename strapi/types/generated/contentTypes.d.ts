@@ -420,6 +420,7 @@ export interface ApiTopicTopic extends Struct.CollectionTypeSchema {
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<'oneToMany', 'api::topic.topic'> &
       Schema.Attribute.Private;
+    percentage: Schema.Attribute.Integer;
     publishedAt: Schema.Attribute.DateTime;
     subtopics: Schema.Attribute.Relation<'manyToOne', 'api::subtopic.subtopic'>;
     title: Schema.Attribute.String;
