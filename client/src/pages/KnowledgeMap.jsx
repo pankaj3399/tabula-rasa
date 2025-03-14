@@ -6,25 +6,30 @@ import Header from '../components/Header';
 const KnowledgeMap = ({ darkMode, setDarkMode }) => {
   const [systems, setSystems] = useState([]);
   const [expandedSystems, setExpandedSystems] = useState({});
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     // Fetch systems data (mapped from Strapi Topics) with nested subtopics
     axios
-      .get('http://localhost:3000/api/knowledge-map')
+      .get(`${import.meta.env.VITE_API_URL}/knowledge-map`)
       .then(response => {
         // Map Strapi's Topic data to the UI's expected "systems" structure
         const mappedSystems = response.data.data.map(topic => ({
           id: topic.id,
           attributes: {
-            name: topic.attributes.title, // Map Strapi's title to system name
-            percentage: topic.attributes.percentage || 10, // Use percentage if added, else mock
+            name: topic.title, // Map Strapi's title to system name
+            percentage: topic.percentage || 10, // Use percentage if added, else mock
             topics: {
-              data: topic.attributes.subtopics.data.map(subtopic => ({
-                id: subtopic.id,
-                attributes: {
-                  name: subtopic.attributes.title, // Map subtopic title to topic name
-                },
-              })),
+              data: topic.subtopics
+                ? [
+                    {
+                      id: topic.subtopics.id,
+                      attributes: {
+                        name: topic.subtopics.title, // Map subtopic title to topic name
+                      },
+                    },
+                  ]
+                : [], // Handle case where subtopics is missing or empty
             },
           },
         }));
@@ -37,8 +42,12 @@ const KnowledgeMap = ({ darkMode, setDarkMode }) => {
           initialExpanded[system.id] = true;
         });
         setExpandedSystems(initialExpanded);
+        setError(null);
       })
-      .catch(error => console.error('Error fetching systems:', error));
+      .catch(error => {
+        console.error('Error fetching systems:', error);
+        setError('Failed to load knowledge map. Please try again later.');
+      });
   }, []);
 
   const toggleSystem = systemId => {
@@ -56,6 +65,8 @@ const KnowledgeMap = ({ darkMode, setDarkMode }) => {
     };
     return icons[systemName] || '🔬'; // Default icon if not found
   };
+
+  if (error) return <div className="text-center py-10 text-red-500">{error}</div>;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -111,29 +122,33 @@ const KnowledgeMap = ({ darkMode, setDarkMode }) => {
 
             {expandedSystems[system.id] && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2 p-4">
-                {system.attributes.topics?.data.map(topic => (
-                  <Link
-                    key={topic.id}
-                    to={`/subtopic-content/${topic.id}`} // Update route to match SubtopicContent.jsx
-                    className="flex items-center justify-between p-3 bg-white border border-gray-200 rounded-md hover:bg-gray-50 transition-colors"
-                  >
-                    <span className="text-gray-800 text-sm">{topic.attributes.name}</span>
-                    <span className="text-purple-600">
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        width="16"
-                        height="16"
-                        fill="currentColor"
-                        viewBox="0 0 16 16"
-                      >
-                        <path
-                          fillRule="evenodd"
-                          d="M4.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L10.293 8 4.646 2.354a.5.5 0 0 1 0-.708z"
-                        />
-                      </svg>
-                    </span>
-                  </Link>
-                ))}
+                {system.attributes.topics?.data.length > 0 ? (
+                  system.attributes.topics.data.map(topic => (
+                    <Link
+                      key={topic.id}
+                      to={`/subtopic-content/${topic.id}`}
+                      className="flex items-center justify-between p-3 bg-white border border-gray-200 rounded-md hover:bg-gray-50 transition-colors"
+                    >
+                      <span className="text-gray-800 text-sm">{topic.attributes.name}</span>
+                      <span className="text-purple-600">
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="16"
+                          height="16"
+                          fill="currentColor"
+                          viewBox="0 0 16 16"
+                        >
+                          <path
+                            fillRule="evenodd"
+                            d="M4.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L10.293 8 4.646 2.354a.5.5 0 0 1 0-.708z"
+                          />
+                        </svg>
+                      </span>
+                    </Link>
+                  ))
+                ) : (
+                  <p className="text-gray-500 text-sm p-3">No subtopics available for this system.</p>
+                )}
               </div>
             )}
           </div>

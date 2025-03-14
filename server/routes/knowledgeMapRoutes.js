@@ -6,6 +6,6 @@ const knowledgeMapController = require('../controllers/knowledgeMapController');
 router.get('/knowledge-map', knowledgeMapController.getKnowledgeMap);
 // Existing routes
 router.get('/topics', knowledgeMapController.getKnowledgeMap);
-router.get('/subtopic/:id', knowledgeMapController.getSubtopicContent);
+router.get('/subtopic-content/:id', knowledgeMapController.getSubtopicContent);
 
 module.exports = router;

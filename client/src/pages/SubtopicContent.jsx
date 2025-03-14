@@ -1,4 +1,3 @@
-// client/src/pages/SubtopicContent.jsx
 import React, { useState, useEffect } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import axios from 'axios';
@@ -13,11 +12,11 @@ const SubtopicContent = ({ darkMode, setDarkMode }) => {
   useEffect(() => {
     // Fetch subtopic content from backend
     axios
-      .get(`http://localhost:3000/api/subtopic-content/${id}`)
+      .get(`${import.meta.env.VITE_API_URL}/subtopic-content/${id}`)
       .then(response => {
         const data = response.data.data;
         setSubtopic(data);
-        setNotes(data.attributes.notes || '');
+        setNotes(data.notes || '');
       })
       .catch(error => console.error('Error fetching subtopic content:', error));
   }, [id]);
@@ -28,7 +27,7 @@ const SubtopicContent = ({ darkMode, setDarkMode }) => {
 
   const saveNotes = async () => {
     try {
-      await axios.put(`http://localhost:3000/api/subtopic-content/${id}`, {
+      await axios.put(`${import.meta.env.VITE_API_URL}/subtopic-content/${id}`, {
         notes,
       });
       alert('Notes saved successfully!');
@@ -72,8 +71,8 @@ const SubtopicContent = ({ darkMode, setDarkMode }) => {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="bg-gray-800 p-6 rounded-lg">
-            <h2 className="text-xl font-bold mb-4">{subtopic.attributes.topic?.data.attributes.name}</h2>
-            <h3 className="text-lg font-semibold mb-2">{subtopic.attributes.name}</h3>
+            <h2 className="text-xl font-bold mb-4">{subtopic.topic?.title || 'Topic'}</h2>
+            <h3 className="text-lg font-semibold mb-2">{subtopic.title}</h3>
             {/* Placeholder for image - replace with actual image from Strapi if available */}
             <img
               src="https://via.placeholder.com/400x300?text=Heart+Anatomy"
@@ -81,7 +80,13 @@ const SubtopicContent = ({ darkMode, setDarkMode }) => {
               className="w-full h-48 object-cover rounded-md mb-4"
             />
             <p className="text-gray-300">
-              {subtopic.attributes.content || 'Understanding the normal heart structure is crucial for comprehending...'}
+              {subtopic.content
+                ? subtopic.content.map(item =>
+                    item.type === 'paragraph'
+                      ? item.children.map(child => child.text).join('')
+                      : ''
+                  ).join('')
+                : 'Understanding the normal heart structure is crucial for comprehending...'}
             </p>
           </div>
 
