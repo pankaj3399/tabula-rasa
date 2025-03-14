@@ -1,4 +1,3 @@
-// client/src/contexts/AuthContext.jsx
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -11,55 +10,45 @@ export function AuthProvider({ children }) {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const storedUser = localStorage.getItem('user');
-    const storedToken = localStorage.getItem('token');
+    const initializeAuth = async () => {
+      const storedUser = localStorage.getItem('user');
+      const storedToken = localStorage.getItem('token');
 
-    if (storedUser && storedToken) {
-      try {
-        const parsedUser = JSON.parse(storedUser);
-        if (isTokenValid(storedToken)) {
-          setCurrentUser(parsedUser);
-          // Optionally verify token with the server
-          validateTokenWithServer(storedToken).catch(() => {
-            logout(); // Logout if token is invalid on the server
-          });
-        } else {
+      if (storedUser && storedToken) {
+        try {
+          const parsedUser = JSON.parse(storedUser);
+          if (isTokenValid(storedToken)) {
+            setCurrentUser(parsedUser);
+            console.log('Token restored and valid:', storedToken);
+          } else {
+            console.log('Token expired or invalid, logging out');
+            logout();
+          }
+        } catch (parseError) {
+          console.error('Error parsing stored user:', parseError);
           logout();
         }
-      } catch (parseError) {
-        console.error('Error parsing stored user:', parseError);
-        logout();
+      } else {
+        console.log('No stored user or token found');
       }
-    }
-    setLoading(false);
+      setLoading(false);
+    };
+
+    initializeAuth();
   }, []);
 
   const isTokenValid = (token) => {
     if (!token || token.length === 0) return false;
     try {
-      // Basic JWT validation (assumes token is a JWT)
       const payload = JSON.parse(atob(token.split('.')[1]));
-      const expiry = payload.exp * 1000; // Convert to milliseconds
-      return Date.now() < expiry;
+      const expiry = payload.exp * 1000;
+      const isValid = Date.now() < expiry;
+      console.log('Token expiry check:', { now: Date.now(), expiry, isValid });
+      return isValid;
     } catch (error) {
       console.error('Error decoding token:', error);
       return false;
     }
-  };
-
-  const validateTokenWithServer = async (token) => {
-    // Optional: Make a request to the server to validate the token
-    const response = await fetch(`${import.meta.env.VITE_API_URL}/auth/validate`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-      },
-    });
-    if (!response.ok) {
-      throw new Error('Token validation failed');
-    }
-    return response.json();
   };
 
   const login = async (email, password) => {
@@ -67,7 +56,6 @@ export function AuthProvider({ children }) {
     setLoading(true);
     try {
       console.log('Login request data:', { email, password });
-      console.log('API URL:', `${import.meta.env.VITE_API_URL}/auth/login`);
       const response = await fetch(`${import.meta.env.VITE_API_URL}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -84,7 +72,8 @@ export function AuthProvider({ children }) {
       setCurrentUser(data.user);
       localStorage.setItem('user', JSON.stringify(data.user));
       localStorage.setItem('token', data.token);
-      navigate('/dashboard'); // Redirect to dashboard after login
+      console.log('Login successful, token stored:', data.token);
+      navigate('/dashboard');
       return data;
     } catch (error) {
       console.error('Login error:', error);
@@ -100,7 +89,6 @@ export function AuthProvider({ children }) {
     setLoading(true);
     try {
       console.log('Signup request data:', { email, password, name });
-      console.log('API URL:', `${import.meta.env.VITE_API_URL}/auth/signup`);
       const response = await fetch(`${import.meta.env.VITE_API_URL}/auth/signup`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -117,7 +105,8 @@ export function AuthProvider({ children }) {
       setCurrentUser(data.user);
       localStorage.setItem('user', JSON.stringify(data.user));
       localStorage.setItem('token', data.token);
-      navigate('/dashboard'); // Redirect to dashboard after signup
+      console.log('Signup successful, token stored:', data.token);
+      navigate('/dashboard');
       return data;
     } catch (error) {
       console.error('Signup error:', error);
@@ -128,29 +117,13 @@ export function AuthProvider({ children }) {
     }
   };
 
-  const logout = async () => {
-    try {
-      // Optional: Make a server-side logout request to invalidate the token
-      const token = localStorage.getItem('token');
-      if (token) {
-        await fetch(`${import.meta.env.VITE_API_URL}/auth/logout`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-        });
-      }
-    } catch (error) {
-      console.error('Logout error:', error);
-      setError(error.message || 'Failed to logout');
-    } finally {
-      setCurrentUser(null);
-      setError(null);
-      localStorage.removeItem('user');
-      localStorage.removeItem('token');
-      navigate('/'); // Redirect to landing page after logout
-    }
+  const logout = () => {
+    console.log('Logging out');
+    setCurrentUser(null);
+    setError(null);
+    localStorage.removeItem('user');
+    localStorage.removeItem('token');
+    navigate('/');
   };
 
   const value = {
@@ -162,11 +135,7 @@ export function AuthProvider({ children }) {
     error,
   };
 
-  return (
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 export const useAuth = () => {
