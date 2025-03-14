@@ -8,17 +8,35 @@ const SubtopicContent = ({ darkMode, setDarkMode }) => {
   const [subtopic, setSubtopic] = useState(null);
   const [notes, setNotes] = useState('');
   const [activePage, setActivePage] = useState('Page 1');
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     // Fetch subtopic content from backend
     axios
       .get(`${import.meta.env.VITE_API_URL}/subtopic-content/${id}`)
       .then(response => {
-        const data = response.data.data;
-        setSubtopic(data);
+        console.log('Subtopic Content Response:', response.data);
+        
+        // Handle potential null or undefined response
+        if (!response.data || !response.data.data) {
+          throw new Error('Invalid response format');
+        }
+        
+        const data = response.data.data.attributes; // Strapi wraps fields in attributes
+        setSubtopic({
+          id: response.data.data.id,
+          title: data.title,
+          content: data.content || 'No content available',
+          notes: data.notes || '',
+          topic: data.topic?.data?.attributes || null, // Access related topic
+        });
         setNotes(data.notes || '');
+        setError(null);
       })
-      .catch(error => console.error('Error fetching subtopic content:', error));
+      .catch(error => {
+        console.error('Error fetching subtopic content:', error.response ? error.response.data : error.message);
+        setError('Failed to load subtopic content. Please try again later.');
+      });
   }, [id]);
 
   const handleNotesChange = e => {
@@ -37,6 +55,7 @@ const SubtopicContent = ({ darkMode, setDarkMode }) => {
     }
   };
 
+  if (error) return <div className="text-center py-10 text-red-500">{error}</div>;
   if (!subtopic) return <div className="text-center py-10 text-white">Loading...</div>;
 
   return (
@@ -80,13 +99,7 @@ const SubtopicContent = ({ darkMode, setDarkMode }) => {
               className="w-full h-48 object-cover rounded-md mb-4"
             />
             <p className="text-gray-300">
-              {subtopic.content
-                ? subtopic.content.map(item =>
-                    item.type === 'paragraph'
-                      ? item.children.map(child => child.text).join('')
-                      : ''
-                  ).join('')
-                : 'Understanding the normal heart structure is crucial for comprehending...'}
+              {subtopic.content || 'Understanding the normal heart structure is crucial for comprehending...'}
             </p>
           </div>
 

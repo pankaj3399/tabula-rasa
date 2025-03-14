@@ -19,7 +19,7 @@ exports.getKnowledgeMap = async (req, res) => {
     });
     res.json(response.data);
   } catch (error) {
-    console.error('Error fetching knowledge map:', error);
+    console.error('Error fetching knowledge map:', error.response ? error.response.data : error.message);
     res.status(500).json({ error: 'Failed to fetch knowledge map' });
   }
 };
@@ -30,8 +30,8 @@ exports.getSubtopicContent = async (req, res) => {
 
   try {
     const { id } = req.params;
-    console.log(`Fetching subtopic with id: ${id} from ${STRAPI_URL}/api/subtopic/${id}?populate=*`);
-    const response = await axios.get(`${STRAPI_URL}/api/subtopic/${id}?populate=*`, {
+    console.log(`Fetching subtopic with id: ${id} from ${STRAPI_URL}/api/subtopics/${id}?populate=*`);
+    const response = await axios.get(`${STRAPI_URL}/api/subtopics/${id}?populate=*`, {
       headers: {
         Authorization: `Bearer ${STRAPI_TOKEN}`,
       },
@@ -52,7 +52,7 @@ exports.updateSubtopicNotes = async (req, res) => {
     const { id } = req.params;
     const { notes } = req.body;
     const response = await axios.put(
-      `${STRAPI_URL}/api/subtopic/${id}`,
+      `${STRAPI_URL}/api/subtopics/${id}`,
       {
         data: { notes },
       },
@@ -64,7 +64,7 @@ exports.updateSubtopicNotes = async (req, res) => {
     );
     res.json(response.data);
   } catch (error) {
-    console.error('Error updating subtopic notes:', error);
+    console.error('Error updating subtopic notes:', error.response ? error.response.data : error.message);
     res.status(500).json({ error: 'Failed to update subtopic notes' });
   }
 };
