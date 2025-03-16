@@ -59,3 +59,13 @@ Feel free to check out the [Strapi GitHub repository](https://github.com/strapi/
 ---
 
 <sub>🤫 Psst! [Strapi is hiring](https://strapi.io/careers).</sub>
+
+
+## API Endpoints
+
+- **GET /api/topics**: Fetch all topics.
+  - Example: `http://localhost:1337/api/topics?populate=subtopics`
+- **GET /api/subtopics/:id**: Fetch a specific subtopic by ID.
+  - Example: `http://localhost:1337/api/subtopics/1?populate=*`
+- **PUT /api/subtopics/:id**: Update a subtopic (e.g., to save notes).
+  - Example: `PUT http://localhost:1337/api/subtopics/1` with body `{ "data": { "notes": "string" } }`
