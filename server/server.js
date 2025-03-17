@@ -1,9 +1,19 @@
-// server/server.js
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const authRoutes = require('./routes/authRoutes');
-require('dotenv').config();
+const knowledgeMapRoutes = require('./routes/knowledgeMapRoutes');
+const path = require('path');
+
+// Load environment variables
+require('dotenv').config({ path: path.resolve(__dirname, '.env') });
+
+// Debug: Log environment variables to confirm they are loaded
+console.log('Environment Variables Loaded:');
+console.log('STRAPI_URL:', process.env.STRAPI_URL);
+console.log('STRAPI_TOKEN:', process.env.STRAPI_TOKEN);
+console.log('MONGO_URI:', process.env.MONGO_URI);
+console.log('PORT:', process.env.PORT);
 
 const app = express();
 
@@ -24,6 +34,7 @@ mongoose.connect(process.env.MONGO_URI, {
 
 // Routes
 app.use('/api/auth', authRoutes);
+app.use('/api', knowledgeMapRoutes);
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {

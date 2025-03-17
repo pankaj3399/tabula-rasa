@@ -1,46 +1,41 @@
-// src/pages/Dashboard.jsx
+// client/src/pages/Dashboard.jsx
 import React from 'react';
-import { motion } from 'framer-motion';
-import { User, BookOpen, TrendingUp } from 'lucide-react';
-import { useAuth } from '../contexts/AuthContext';
+import Header from '../components/Header';
+import WelcomeSection from '../components/WelcomeSection';
+import StudyPlan from '../components/StudyPlan';
+import ContinueLearning from '../components/ContinueLearning';
+import TodaysSchedule from '../components/TodaysSchedule';
+import QuickActions from '../components/QuickActions';
+import UpcomingTests from '../components/UpcomingTests';
+import PANCEBlueprintProgress from '../components/PANCEBlueprintProgress';
+import RecommendedTopics from '../components/RecommendedTopics';
 
-const Dashboard = () => {
-  const { currentUser } = useAuth();
-
+const Dashboard = ({ darkMode, setDarkMode }) => {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-indigo-50 to-blue-50 py-20 px-6">
-      <motion.div
-        initial={{ opacity: 0, y: 30 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.8 }}
-        className="max-w-4xl mx-auto bg-white/90 backdrop-blur-md shadow-2xl rounded-2xl p-8 border border-purple-100"
-      >
-        <h1 className="text-4xl font-bold text-purple-800 mb-6 flex items-center">
-          <User className="mr-3 w-8 h-8" /> Welcome, {currentUser?.name || 'User'}!
-        </h1>
-        <p className="text-xl text-gray-600 mb-10">
-          Your personalized medical learning dashboard.
-        </p>
-
-        <div className="grid md:grid-cols-2 gap-6">
-          <motion.div
-            whileHover={{ scale: 1.03 }}
-            className="bg-purple-50 p-6 rounded-xl shadow-md"
-          >
-            <BookOpen className="w-12 h-12 text-purple-600 mb-4" />
-            <h2 className="text-2xl font-semibold text-purple-800 mb-2">Learning Paths</h2>
-            <p className="text-gray-600">Continue your studies with tailored content.</p>
-          </motion.div>
-          <motion.div
-            whileHover={{ scale: 1.03 }}
-            className="bg-purple-50 p-6 rounded-xl shadow-md"
-          >
-            <TrendingUp className="w-12 h-12 text-green-500 mb-4" />
-            <h2 className="text-2xl font-semibold text-purple-800 mb-2">Progress</h2>
-            <p className="text-gray-600">Track your performance and milestones.</p>
-          </motion.div>
+    <div className="min-h-screen bg-white">
+      <Header darkMode={darkMode} setDarkMode={setDarkMode} />
+      <div className="container mx-auto px-4 max-w-7xl py-4">
+        <WelcomeSection />
+        <div className="mt-4">
+          <StudyPlan />
         </div>
-      </motion.div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+          <ContinueLearning />
+          <TodaysSchedule />
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+          <QuickActions />
+          <UpcomingTests />
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
+          <div className="md:col-span-2">
+            <PANCEBlueprintProgress />
+          </div>
+          <div>
+            <RecommendedTopics />
+          </div>
+        </div>
+      </div>
     </div>
   );
 };

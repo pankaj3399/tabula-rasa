@@ -1,0 +1,33 @@
+{
+  "kind": "collectionType",
+  "collectionName": "subtopics",
+  "info": {
+    "singularName": "subtopic",
+    "pluralName": "subtopics",
+    "displayName": "Subtopic",
+    "description": ""
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "attributes": {
+    "title": {
+      "type": "string"
+    },
+    "content": {
+      "type": "blocks"
+    },
+    "subtopics": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::topic.topic",
+      "inversedBy": "topic"
+    },
+    "topic": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::topic.topic",
+      "mappedBy": "subtopics"
+    }
+  }
+}
