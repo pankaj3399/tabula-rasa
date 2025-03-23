@@ -392,9 +392,8 @@ export interface ApiSubtopicSubtopic extends Struct.CollectionTypeSchema {
     > &
       Schema.Attribute.Private;
     publishedAt: Schema.Attribute.DateTime;
-    subtopics: Schema.Attribute.Relation<'manyToOne', 'api::topic.topic'>;
     title: Schema.Attribute.String;
-    topic: Schema.Attribute.Relation<'oneToMany', 'api::topic.topic'>;
+    topic: Schema.Attribute.Relation<'manyToOne', 'api::topic.topic'>;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
@@ -420,11 +419,9 @@ export interface ApiTopicTopic extends Struct.CollectionTypeSchema {
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<'oneToMany', 'api::topic.topic'> &
       Schema.Attribute.Private;
-    percentage: Schema.Attribute.Integer;
     publishedAt: Schema.Attribute.DateTime;
-    subtopics: Schema.Attribute.Relation<'manyToOne', 'api::subtopic.subtopic'>;
+    subtopics: Schema.Attribute.Relation<'oneToMany', 'api::subtopic.subtopic'>;
     title: Schema.Attribute.String;
-    topic: Schema.Attribute.Relation<'oneToMany', 'api::subtopic.subtopic'>;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;

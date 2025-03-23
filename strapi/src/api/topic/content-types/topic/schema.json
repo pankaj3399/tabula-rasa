@@ -17,20 +17,11 @@
     "description": {
       "type": "text"
     },
-    "topic": {
+    "subtopics": {
       "type": "relation",
       "relation": "oneToMany",
       "target": "api::subtopic.subtopic",
-      "mappedBy": "subtopics"
-    },
-    "subtopics": {
-      "type": "relation",
-      "relation": "manyToOne",
-      "target": "api::subtopic.subtopic",
-      "inversedBy": "topic"
-    },
-    "percentage": {
-      "type": "integer"
+      "mappedBy": "topic"
     }
   }
 }

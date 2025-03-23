@@ -17,17 +17,11 @@
     "content": {
       "type": "blocks"
     },
-    "subtopics": {
+    "topic": {
       "type": "relation",
       "relation": "manyToOne",
       "target": "api::topic.topic",
-      "inversedBy": "topic"
-    },
-    "topic": {
-      "type": "relation",
-      "relation": "oneToMany",
-      "target": "api::topic.topic",
-      "mappedBy": "subtopics"
+      "inversedBy": "subtopics"
     }
   }
 }
