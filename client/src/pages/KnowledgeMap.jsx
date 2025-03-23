@@ -13,26 +13,37 @@ const KnowledgeMap = ({ darkMode, setDarkMode }) => {
     axios
       .get(`${import.meta.env.VITE_API_URL}/knowledge-map`)
       .then(response => {
+        console.log('API Response from /knowledge-map:', JSON.stringify(response.data, null, 2)); // Debug: Log the raw API response with full details
+
         // Map Strapi's Topic data to the UI's expected "systems" structure
-        const mappedSystems = response.data.data.map(topic => ({
-          id: topic.id,
-          attributes: {
-            name: topic.title, // Map Strapi's title to system name
-            percentage: topic.percentage || 10, // Use percentage if added, else mock
-            topics: {
-              data: topic.subtopics
-                ? [
-                    {
-                      id: topic.subtopics.id,
-                      attributes: {
-                        name: topic.subtopics.title, // Map subtopic title to topic name
-                      },
-                    },
-                  ]
-                : [], // Handle case where subtopics is missing or empty
+        const mappedSystems = response.data.data.map(topic => {
+          // Handle subtopics directly under topic.subtopics or topic.attributes.subtopics
+          const subtopicsData = topic.subtopics
+            ? Array.isArray(topic.subtopics)
+              ? topic.subtopics
+              : topic.subtopics.data || []
+            : topic.attributes?.subtopics?.data || [];
+
+          console.log(`Topic ${topic.attributes?.title || topic.title} Subtopics:`, JSON.stringify(subtopicsData, null, 2)); // Debug: Log subtopics for each topic
+
+          return {
+            id: topic.id,
+            attributes: {
+              name: topic.attributes?.title || topic.title,
+              percentage: topic.attributes?.percentage || topic.percentage || 10,
+              topics: {
+                data: subtopicsData.map(subtopic => ({
+                  id: subtopic.id,
+                  attributes: {
+                    name: subtopic.attributes?.title || subtopic.title,
+                  },
+                })),
+              },
             },
-          },
-        }));
+          };
+        });
+
+        console.log('Mapped Systems:', JSON.stringify(mappedSystems, null, 2)); // Debug: Log the mapped systems with full details
 
         setSystems(mappedSystems);
 
@@ -58,12 +69,16 @@ const KnowledgeMap = ({ darkMode, setDarkMode }) => {
   };
 
   // Function to determine icon based on system name
-  const getSystemIcon = (systemName) => {
+  const getSystemIcon = systemName => {
     const icons = {
-      'Cardiomyopathies': '❤️', // Map to match sample data
-      'Hypertension': '🩺',     // Custom icon for Hypertension
+      'Cardiomyopathies': '❤️',
+      'Hypertension': '🩺',
+      'Cardiovuscular system': '❤️',
+      'Pulmonary System': '🫁',
+      'Infectious diseases': '🦠',
+      'Reproductive System': '🩺',
     };
-    return icons[systemName] || '🔬'; // Default icon if not found
+    return icons[systemName] || '🔬';
   };
 
   if (error) return <div className="text-center py-10 text-red-500">{error}</div>;

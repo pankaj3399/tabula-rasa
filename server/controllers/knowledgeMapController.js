@@ -12,11 +12,12 @@ exports.getKnowledgeMap = async (req, res) => {
     if (!STRAPI_URL || !STRAPI_TOKEN) {
       throw new Error('STRAPI_URL or STRAPI_TOKEN is not defined in environment variables');
     }
-    const response = await axios.get(`${STRAPI_URL}/api/topics?populate=subtopics`, {
+    const response = await axios.get(`${STRAPI_URL}/api/topics?populate=subtopics&publicationState=live`, {
       headers: {
         Authorization: `Bearer ${STRAPI_TOKEN}`,
       },
     });
+    console.log('Strapi Response for /api/topics:', response.data); // Debug: Log the raw response from Strapi
     res.json(response.data);
   } catch (error) {
     console.error('Error fetching knowledge map:', error.response ? error.response.data : error.message);
@@ -31,7 +32,7 @@ exports.getSubtopicContent = async (req, res) => {
   try {
     const { id } = req.params;
     console.log(`Fetching subtopic with id: ${id} from ${STRAPI_URL}/api/subtopics/${id}?populate=*`);
-    const response = await axios.get(`${STRAPI_URL}/api/subtopics/${id}?populate=*`, {
+    const response = await axios.get(`${STRAPI_URL}/api/subtopics/${id}?populate=*&publicationState=live`, {
       headers: {
         Authorization: `Bearer ${STRAPI_TOKEN}`,
       },
