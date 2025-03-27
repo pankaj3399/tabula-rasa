@@ -34,7 +34,7 @@ const KnowledgeMap = ({ darkMode, setDarkMode }) => {
             id: topic.id,
             attributes: {
               name: correctedName,
-              subtopicsCount: subtopicsData.length, // Store the number of subtopics
+              percentage: topic.attributes?.percentage || topic.percentage || 0, // Use Strapi percentage, default to 0 if missing
               topics: {
                 data: subtopicsData.map(subtopic => ({
                   id: subtopic.id,
@@ -47,29 +47,14 @@ const KnowledgeMap = ({ darkMode, setDarkMode }) => {
           };
         });
 
-        // Calculate the total number of subtopics across all topics
-        const totalSubtopics = mappedSystems.reduce((total, system) => total + system.attributes.subtopicsCount, 0);
-
-        // Calculate the percentage per subtopic (if there are subtopics)
-        const percentagePerSubtopic = totalSubtopics > 0 ? 100 / totalSubtopics : 0;
-
-        // Assign a percentage to each topic based on the number of subtopics
-        mappedSystems = mappedSystems.map(system => ({
-          ...system,
-          attributes: {
-            ...system.attributes,
-            percentage: Math.round(system.attributes.subtopicsCount * percentagePerSubtopic), // Round to nearest integer
-          },
-        }));
-
-        // Sort systems by percentage (highest to lowest)
+        // Sort systems by percentage (highest to lowest) using Strapi data
         mappedSystems.sort((a, b) => b.attributes.percentage - a.attributes.percentage);
 
-        console.log('Mapped Systems with Calculated Percentages:', JSON.stringify(mappedSystems, null, 2));
+        console.log('Mapped Systems:', JSON.stringify(mappedSystems, null, 2));
 
         setSystems(mappedSystems);
 
-        // Initially collapse all systems to reduce crowding (Request #5)
+        // Initially collapse all systems to reduce crowding
         const initialExpanded = {};
         mappedSystems.forEach(system => {
           initialExpanded[system.id] = false; // Set to false to collapse by default
@@ -90,7 +75,8 @@ const KnowledgeMap = ({ darkMode, setDarkMode }) => {
     }));
   };
 
-  // Function to determine image URL based on system name (Request #1)
+  // Commenting out the getSystemImage function as icons are being removed for now
+  /*
   const getSystemImage = systemName => {
     const images = {
       'Cardiovascular System': 'https://media.istockphoto.com/id/1182472970/vector/red-heart-sign-isolated-on-transparent-background-valentines-day-icon-hand-drawn-heart-shape.jpg?s=612x612&w=0&k=20&c=ZbzqqSjwkthlELr35fgYUad-drRcSKPUF7zMx0e3rEE=', // Heart
@@ -111,6 +97,7 @@ const KnowledgeMap = ({ darkMode, setDarkMode }) => {
     };
     return images[systemName] || 'https://www.shutterstock.com/image-vector/medical-snake-caduceus-logo-sign-600nw-1511110730.jpg'; // Default image
   };
+  */
 
   if (error) return <div className="text-center py-10 text-red-500">{error}</div>;
 
@@ -131,11 +118,12 @@ const KnowledgeMap = ({ darkMode, setDarkMode }) => {
               onClick={() => toggleSystem(system.id)}
             >
               <div className="flex items-center">
-                <img
+                {/* Commenting out the image tag to remove icons */}
+                {/* <img
                   src={getSystemImage(system.attributes.name)}
                   alt={`${system.attributes.name} icon`}
                   className="w-8 h-8 mr-2 rounded-lg object-cover"
-                />
+                /> */}
                 <span className="font-semibold text-gray-900">{system.attributes.name}</span>
               </div>
               <div className="flex items-center">
