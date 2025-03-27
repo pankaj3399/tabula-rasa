@@ -17,6 +17,17 @@
     "description": {
       "type": "text"
     },
+    "percentage": {
+      "type": "integer",
+      "required": true,
+      "min": 0,
+      "max": 100
+    },
+    "order": {
+      "type": "integer",
+      "required": true,
+      "min": 1
+    },
     "subtopics": {
       "type": "relation",
       "relation": "oneToMany",
