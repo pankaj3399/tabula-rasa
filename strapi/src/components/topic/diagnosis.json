@@ -1,0 +1,17 @@
+{
+    "collectionName": "components_topic_diagnoses",
+    "info": {
+      "displayName": "Diagnosis",
+      "description": ""
+    },
+    "options": {},
+    "attributes": {
+      "overview": {
+        "type": "richtext"
+      },
+      "tools": {
+        "type": "text",
+        "repeatable": true
+      }
+    }
+  }

@@ -1,0 +1,53 @@
+{
+  "kind": "collectionType",
+  "collectionName": "cards",
+  "info": {
+    "singularName": "card",
+    "pluralName": "cards",
+    "displayName": "Card",
+    "description": ""
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "attributes": {
+    "question_text": {
+      "type": "richtext",
+      "required": true
+    },
+    "scenario": {
+      "type": "richtext"
+    },
+    "card_type": {
+      "type": "enumeration",
+      "enum": [
+        "clinical-vignette",
+        "fill-in-blank",
+        "short-answer",
+        "diagram-labeling"
+      ],
+      "required": true
+    },
+    "options": {
+      "type": "json"
+    },
+    "correct_answer": {
+      "type": "string"
+    },
+    "explanation": {
+      "type": "richtext"
+    },
+    "image_or_diagram": {
+      "type": "media",
+      "multiple": false,
+      "required": false,
+      "allowedTypes": ["images"]
+    },
+    "topic": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::topic.topic",
+      "inversedBy": "cards"
+    }
+  }
+}
