@@ -57,6 +57,7 @@ exports.getSubtopicContent = async (req, res) => {
 
   try {
     const { id } = req.params;
+    console.log(`Attempting to fetch subtopic with ID: ${id} from ${STRAPI_URL}/api/subtopics/${id}`);
     const response = await axios.get(
       `${STRAPI_URL}/api/subtopics/${id}?populate=*&publicationState=live`,
       {
@@ -65,17 +66,28 @@ exports.getSubtopicContent = async (req, res) => {
         },
       }
     );
-    console.log('Subtopic Content Response:', response.data);
+    console.log('Subtopic Content Response:', JSON.stringify(response.data, null, 2));
+    if (!response.data.data) {
+      return res.status(404).json({ error: `Subtopic with ID ${id} not found` });
+    }
     res.json(response.data);
   } catch (error) {
-    console.error('Error fetching subtopic content:', error.response ? error.response.data : error.message);
-    res.status(500).json({ error: 'Failed to fetch subtopic content' });
+    console.error('Error fetching subtopic content:', {
+      message: error.message,
+      response: error.response ? error.response.data : 'No response',
+      status: error.response ? error.response.status : 'Unknown',
+      config: error.config ? error.config.url : 'No config',
+    });
+    // Pass the original Strapi error status if available
+    res.status(error.response?.status || 500).json({
+      error: error.response?.data?.error?.message || 'Failed to fetch subtopic content',
+    });
   }
 };
 
 exports.getDueCards = async (req, res) => {
   try {
-    const userId = req.query.userId; // Assume userId is passed as a query parameter
+    const userId = req.query.userId;
     const user = await User.findById(userId);
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
@@ -98,7 +110,7 @@ exports.getCardsByIds = async (req, res) => {
   const STRAPI_TOKEN = process.env.STRAPI_TOKEN;
 
   try {
-    const { ids } = req.body; // Expect an array of card IDs
+    const { ids } = req.body;
     if (!Array.isArray(ids) || ids.length === 0) {
       return res.status(400).json({ error: 'Invalid or empty card IDs' });
     }
@@ -121,7 +133,7 @@ exports.getCardsByIds = async (req, res) => {
 
 exports.updateCardProgress = async (req, res) => {
   try {
-    const { userId, cardId, quality } = req.body; // Quality rating (0-5)
+    const { userId, cardId, quality } = req.body;
     const user = await User.findById(userId);
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
@@ -129,7 +141,6 @@ exports.updateCardProgress = async (req, res) => {
 
     const cardProgress = user.cardProgress.find(cp => cp.cardId.toString() === cardId);
     if (!cardProgress) {
-      // Initialize progress for new card
       user.cardProgress.push({
         cardId,
         dueDate: new Date(),
@@ -139,12 +150,10 @@ exports.updateCardProgress = async (req, res) => {
         quality,
       });
     } else {
-      // Update existing progress using SM-2 algorithm
       cardProgress.lastReviewed = new Date();
       cardProgress.quality = quality;
 
       if (quality >= 3) {
-        // Success: Increase interval
         if (cardProgress.interval === 1) {
           cardProgress.interval = 1;
         } else if (cardProgress.interval === 1) {
@@ -154,7 +163,6 @@ exports.updateCardProgress = async (req, res) => {
         }
         cardProgress.easeFactor = Math.max(1.3, cardProgress.easeFactor + (0.1 - (5 - quality) * (0.08 + (5 - quality) * 0.02)));
       } else {
-        // Failure: Reset interval
         cardProgress.interval = 1;
       }
 

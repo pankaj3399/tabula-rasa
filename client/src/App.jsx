@@ -44,6 +44,14 @@ const App = () => {
           }
         />
         <Route
+          path="/subtopic/:id"
+          element={
+            <ProtectedRoute>
+              <SubtopicContent darkMode={darkMode} setDarkMode={setDarkMode} />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/hippocampus-hustle/:slug"
           element={
             <ProtectedRoute>

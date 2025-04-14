@@ -9,15 +9,12 @@ const KnowledgeMap = ({ darkMode, setDarkMode }) => {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    // Fetch systems data (mapped from Strapi Topics) with nested subtopics
     axios
       .get(`${import.meta.env.VITE_API_URL}/knowledge-map`)
       .then(response => {
         console.log('API Response from /knowledge-map:', JSON.stringify(response.data, null, 2));
 
-        // Map Strapi's Topic data to the UI's expected "systems" structure
         let mappedSystems = response.data.data.map(topic => {
-          // Handle subtopics directly under topic.subtopics or topic.attributes.subtopics
           const subtopicsData = topic.subtopics
             ? Array.isArray(topic.subtopics)
               ? topic.subtopics
@@ -26,7 +23,6 @@ const KnowledgeMap = ({ darkMode, setDarkMode }) => {
 
           console.log(`Topic ${topic.attributes?.title || topic.title} Subtopics:`, JSON.stringify(subtopicsData, null, 2));
 
-          // Fix typo in the display (but Strapi should be updated)
           const topicName = topic.attributes?.title || topic.title;
           const correctedName = topicName === 'Cardiovuscular system' ? 'Cardiovascular System' : topicName;
 
@@ -34,12 +30,14 @@ const KnowledgeMap = ({ darkMode, setDarkMode }) => {
             id: topic.id,
             attributes: {
               name: correctedName,
-              percentage: topic.attributes?.percentage || topic.percentage || 0, // Use Strapi percentage, default to 0 if missing
+              percentage: topic.attributes?.percentage || topic.percentage || 0,
               topics: {
                 data: subtopicsData.map(subtopic => ({
                   id: subtopic.id,
                   attributes: {
                     name: subtopic.attributes?.title || subtopic.title,
+                    // Temporary fix: Force ID 34 for "Dilated Cardiomyopathy Overview"
+                    id: subtopic.attributes?.title === 'Dilated Cardiomyopathy Overview' ? 34 : subtopic.id,
                   },
                 })),
               },
@@ -47,17 +45,15 @@ const KnowledgeMap = ({ darkMode, setDarkMode }) => {
           };
         });
 
-        // Sort systems by percentage (highest to lowest) using Strapi data
         mappedSystems.sort((a, b) => b.attributes.percentage - a.attributes.percentage);
 
         console.log('Mapped Systems:', JSON.stringify(mappedSystems, null, 2));
 
         setSystems(mappedSystems);
 
-        // Initially collapse all systems to reduce crowding
         const initialExpanded = {};
         mappedSystems.forEach(system => {
-          initialExpanded[system.id] = false; // Set to false to collapse by default
+          initialExpanded[system.id] = false;
         });
         setExpandedSystems(initialExpanded);
         setError(null);
@@ -74,30 +70,6 @@ const KnowledgeMap = ({ darkMode, setDarkMode }) => {
       [systemId]: !prev[systemId],
     }));
   };
-
-  // Commenting out the getSystemImage function as icons are being removed for now
-  /*
-  const getSystemImage = systemName => {
-    const images = {
-      'Cardiovascular System': 'https://media.istockphoto.com/id/1182472970/vector/red-heart-sign-isolated-on-transparent-background-valentines-day-icon-hand-drawn-heart-shape.jpg?s=612x612&w=0&k=20&c=ZbzqqSjwkthlELr35fgYUad-drRcSKPUF7zMx0e3rEE=', // Heart
-      'Dermatologic System': 'https://my.clevelandclinic.org/-/scassets/images/org/health/articles/10978-skin', // Skin
-      'Endocrine System': 'https://media.sciencephoto.com/image/f0244301/800wm', // Glands (placeholder)
-      'Eyes, Ears, Nose, and Throat': 'https://thumbs.dreamstime.com/b/nose-eye-mouth-ear-pictogram-8495638.jpg', // ENT (placeholder)
-      'Gastrointestinal System/Nutrition': 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTLQ0LCggLJwURQLx17Av6WC2xH5rQjTsQkDw&s', // Stomach
-      'Genitourinary System': 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRR8LsTmfxDq8auxv0atlCWChIK9oycAUO1jw&s', // Kidneys (placeholder)
-      'Hematologic System': 'https://static.vecteezy.com/system/resources/previews/055/319/967/non_2x/blood-drop-and-red-blood-cells-icon-illustration-free-vector.jpg', // Blood cells (placeholder)
-      'Infectious Diseases': 'https://cdn5.vectorstock.com/i/1000x1000/88/19/bacteria-virus-icon-vector-10978819.jpg', // Virus
-      'Musculoskeletal System': 'https://media.istockphoto.com/id/2187007394/vector/human-man-skeleton-anatomy-flat-illustration-of-skull-and-bones-in-body-halloween-medical.jpg?s=612x612&w=0&k=20&c=5pUEFqcF8RN_AzPA-EevNil-tcp-nBGiWBosBXyicko=', // Bones
-      'Neurologic System': 'https://media.istockphoto.com/id/853956564/vector/silhouette-of-the-brain-on-a-white-background.jpg?s=612x612&w=0&k=20&c=lgb2a_SMdRz4VNZB2X5heDilBVctOoWQITCkS-FaA_M=', // Brain
-      'Psychiatry/Behavioral Science': 'https://thumbs.dreamstime.com/z/human-head-brain-silhouette-heart-shape-as-love-mental-health-emotional-intelligence-concept-129583892.jpg', // Mind (placeholder)
-      'Pulmonary System': 'https://media.istockphoto.com/id/1217564568/vector/human-lungs-silhouette.jpg?s=612x612&w=0&k=20&c=i1udWQEWmzTJ92OR_tzgdJLFhSdwMrXQFB6_boey4nQ=', // Lungs
-      'Renal System': 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcS_ylJWh_OI6k-VU7s-tREvVmAoSEkcvABIUw&s', // Kidneys
-      'Reproductive System': 'https://www.shutterstock.com/image-vector/gender-icon-pink-blue-symbol-260nw-1705888177.jpg', // Reproductive organs (placeholder)
-      'Professional Practice': 'https://www.shutterstock.com/image-vector/cross-stethoscope-medical-health-care-260nw-478791523.jpg', // Stethoscope (placeholder)
-    };
-    return images[systemName] || 'https://www.shutterstock.com/image-vector/medical-snake-caduceus-logo-sign-600nw-1511110730.jpg'; // Default image
-  };
-  */
 
   if (error) return <div className="text-center py-10 text-red-500">{error}</div>;
 
@@ -118,12 +90,6 @@ const KnowledgeMap = ({ darkMode, setDarkMode }) => {
               onClick={() => toggleSystem(system.id)}
             >
               <div className="flex items-center">
-                {/* Commenting out the image tag to remove icons */}
-                {/* <img
-                  src={getSystemImage(system.attributes.name)}
-                  alt={`${system.attributes.name} icon`}
-                  className="w-8 h-8 mr-2 rounded-lg object-cover"
-                /> */}
                 <span className="font-semibold text-gray-900">{system.attributes.name}</span>
               </div>
               <div className="flex items-center">
@@ -162,7 +128,8 @@ const KnowledgeMap = ({ darkMode, setDarkMode }) => {
                   system.attributes.topics.data.map(topic => (
                     <Link
                       key={topic.id}
-                      to={`/subtopic-content/${topic.id}`}
+                      to={`/subtopic/${topic.id}`}
+                      onClick={() => console.log(`Navigating to subtopic ID: ${topic.id}`)}
                       className="flex items-center justify-between p-3 bg-white border border-gray-200 rounded-md hover:bg-gray-50 transition-colors"
                     >
                       <span className="text-gray-800 text-sm">{topic.attributes.name}</span>
