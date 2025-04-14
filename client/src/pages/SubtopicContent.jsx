@@ -7,44 +7,47 @@ import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
 
 const SubtopicContent = ({ darkMode, setDarkMode }) => {
-  const { slug } = useParams(); // Use slug instead of id
+  const { id } = useParams();
   const { currentUser } = useAuth();
-  const [topic, setTopic] = useState(null);
+  const [subtopic, setSubtopic] = useState(null);
   const [notes, setNotes] = useState('');
   const [activePage, setActivePage] = useState('Page 1');
   const [error, setError] = useState(null);
-  const sectionRefs = useRef({});
 
   useEffect(() => {
-    // Fetch topic content by slug
+    console.log(`Fetching subtopic content for ID: ${id}`);
     axios
-      .get(`${import.meta.env.VITE_API_URL}/topic-content/${slug}`)
+      .get(`${import.meta.env.VITE_API_URL}/subtopic-content/${id}`)
       .then(response => {
-        console.log('Topic Content Response:', response.data);
-        if (!response.data.data || response.data.data.length === 0) {
-          throw new Error('Topic not found');
+        console.log('Subtopic Content Response:', JSON.stringify(response.data, null, 2));
+        if (!response.data.data) {
+          throw new Error('Subtopic not found');
         }
-        const topicData = response.data.data[0];
-        setTopic({
-          id: topicData.id,
-          title: topicData.attributes.title,
-          introduction: topicData.attributes.introduction,
-          types: topicData.attributes.types || [],
-          diagnosis: topicData.attributes.diagnosis,
-          highYieldPoints: topicData.attributes.highYieldPoints,
+        const subtopicData = response.data.data;
+        setSubtopic({
+          id: subtopicData.id,
+          title: subtopicData.attributes.title,
+          content: subtopicData.attributes.content,
         });
         setError(null);
       })
       .catch(error => {
-        console.error('Error fetching topic content:', error.response ? error.response.data : error.message);
-        setError('Failed to load topic content. Please try again later.');
+        console.error('Error fetching subtopic content:', {
+          message: error.message,
+          response: error.response ? error.response.data : 'No response',
+          status: error.response ? error.response.status : 'Unknown',
+        });
+        setError(
+          error.response?.status === 404
+            ? 'Subtopic not found. Please check the ID or ensure it is published.'
+            : 'Failed to load subtopic content. Please try again later.'
+        );
       });
 
-    // Fetch user notes
     if (currentUser) {
       axios
         .get(`${import.meta.env.VITE_API_URL}/subtopic-notes`, {
-          params: { userId: currentUser.id, subtopicId: slug },
+          params: { userId: currentUser.id, subtopicId: id },
         })
         .then(response => {
           setNotes(response.data.notes || '');
@@ -53,7 +56,7 @@ const SubtopicContent = ({ darkMode, setDarkMode }) => {
           console.error('Error fetching notes:', error);
         });
     }
-  }, [slug, currentUser]);
+  }, [id, currentUser]);
 
   const handleNotesChange = value => {
     setNotes(value);
@@ -67,7 +70,7 @@ const SubtopicContent = ({ darkMode, setDarkMode }) => {
     try {
       await axios.post(`${import.meta.env.VITE_API_URL}/update-subtopic-notes`, {
         userId: currentUser.id,
-        subtopicId: slug,
+        subtopicId: id,
         notes,
       });
       alert('Notes saved successfully!');
@@ -77,65 +80,13 @@ const SubtopicContent = ({ darkMode, setDarkMode }) => {
     }
   };
 
-  const scrollToSection = section => {
-    sectionRefs.current[section]?.scrollIntoView({ behavior: 'smooth' });
-  };
-
   if (error) return <div className="text-center py-10 text-red-500">{error}</div>;
-  if (!topic) return <div className="text-center py-10 text-white">Loading...</div>;
+  if (!subtopic) return <div className="text-center py-10 text-white">Loading...</div>;
 
   return (
     <div className="min-h-screen bg-gray-900 text-white">
       <Header darkMode={darkMode} setDarkMode={setDarkMode} />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex">
-        {/* Sticky Table of Contents */}
-        <div className="w-1/4 pr-6 sticky top-20 self-start">
-          <h2 className="text-lg font-bold mb-4">Jump To:</h2>
-          <ul className="space-y-2">
-            {topic.introduction && (
-              <li>
-                <button
-                  onClick={() => scrollToSection('introduction')}
-                  className="text-blue-400 hover:underline"
-                >
-                  Introduction
-                </button>
-              </li>
-            )}
-            {topic.types.length > 0 && (
-              <li>
-                <button
-                  onClick={() => scrollToSection('types')}
-                  className="text-blue-400 hover:underline"
-                >
-                  Types of Cardiomyopathies
-                </button>
-              </li>
-            )}
-            {topic.diagnosis && (
-              <li>
-                <button
-                  onClick={() => scrollToSection('diagnosis')}
-                  className="text-blue-400 hover:underline"
-                >
-                  Diagnosis and Management
-                </button>
-              </li>
-            )}
-            {topic.highYieldPoints && (
-              <li>
-                <button
-                  onClick={() => scrollToSection('highYieldPoints')}
-                  className="text-blue-400 hover:underline"
-                >
-                  High-Yield Points
-                </button>
-              </li>
-            )}
-          </ul>
-        </div>
-
-        {/* Main Content */}
         <div className="w-2/4">
           <div className="flex justify-between items-center mb-6">
             <Link to="/knowledge-map" className="text-blue-400 hover:underline">
@@ -144,7 +95,7 @@ const SubtopicContent = ({ darkMode, setDarkMode }) => {
             <div className="flex items-center space-x-2">
               <span className="text-gray-400">Tabula Rasa</span>
               <Link
-                to={`/hippocampus-hustle/${slug}`}
+                to={`/hippocampus-hustle/${subtopic.id}`}
                 className="bg-purple-600 text-white px-4 py-2 rounded-md flex items-center"
               >
                 <svg
@@ -167,60 +118,16 @@ const SubtopicContent = ({ darkMode, setDarkMode }) => {
           </div>
 
           <div className="bg-gray-800 p-6 rounded-lg">
-            <h2 className="text-xl font-bold mb-4">{topic.title}</h2>
-
-            {topic.introduction && (
-              <div ref={el => (sectionRefs.current['introduction'] = el)} className="mb-6">
-                <h3 className="text-lg font-semibold mb-2">Introduction</h3>
-                <div
-                  className="text-gray-300"
-                  dangerouslySetInnerHTML={{ __html: topic.introduction }}
-                />
-              </div>
-            )}
-
-            {topic.types.length > 0 && (
-              <div ref={el => (sectionRefs.current['types'] = el)} className="mb-6">
-                <h3 className="text-lg font-semibold mb-2">Types of Cardiomyopathies</h3>
-                {topic.types.map((type, index) => (
-                  <div key={index} className="mb-4">
-                    <h4 className="text-md font-medium">{type.name} ({type.abbreviation})</h4>
-                    <div
-                      className="text-gray-300"
-                      dangerouslySetInnerHTML={{ __html: type.description }}
-                    />
-                    <p><strong>Symptoms:</strong> {type.symptoms.join(', ')}</p>
-                    <p><strong>Diagnostic Findings:</strong> {type.diagnosticFindings.join(', ')}</p>
-                    <p><strong>Causes:</strong> {type.causes.join(', ')}</p>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {topic.diagnosis && (
-              <div ref={el => (sectionRefs.current['diagnosis'] = el)} className="mb-6">
-                <h3 className="text-lg font-semibold mb-2">Diagnosis and Management</h3>
-                <div
-                  className="text-gray-300"
-                  dangerouslySetInnerHTML={{ __html: topic.diagnosis.overview }}
-                />
-                <p><strong>Tools:</strong> {topic.diagnosis.tools.join(', ')}</p>
-              </div>
-            )}
-
-            {topic.highYieldPoints && (
-              <div ref={el => (sectionRefs.current['highYieldPoints'] = el)} className="mb-6">
-                <h3 className="text-lg font-semibold mb-2">High-Yield Points</h3>
-                <div
-                  className="text-gray-300"
-                  dangerouslySetInnerHTML={{ __html: topic.highYieldPoints }}
-                />
-              </div>
-            )}
+            <h2 className="text-xl font-bold mb-4">{subtopic.title}</h2>
+            <div className="mb-6">
+              <div
+                className="text-gray-300"
+                dangerouslySetInnerHTML={{ __html: subtopic.content }}
+              />
+            </div>
           </div>
         </div>
 
-        {/* Notes Section */}
         <div className="w-1/4 pl-6">
           <div className="bg-gray-800 p-6 rounded-lg sticky top-20">
             <h2 className="text-xl font-bold mb-4">Notes</h2>
