@@ -12,7 +12,13 @@
   },
   "attributes": {
     "title": {
-      "type": "string"
+      "type": "string",
+      "required": true
+    },
+    "slug": {
+      "type": "uid",
+      "targetField": "title",
+      "required": true
     },
     "description": {
       "type": "text"
@@ -28,10 +34,32 @@
       "required": true,
       "min": 1
     },
+    "introduction": {
+      "type": "richtext"
+    },
+    "types": {
+      "type": "component",
+      "repeatable": true,
+      "component": "topic.type"
+    },
+    "diagnosis": {
+      "type": "component",
+      "repeatable": false,
+      "component": "topic.diagnosis"
+    },
+    "highYieldPoints": {
+      "type": "richtext"
+    },
     "subtopics": {
       "type": "relation",
       "relation": "oneToMany",
       "target": "api::subtopic.subtopic",
+      "mappedBy": "topic"
+    },
+    "cards": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::card.card",
       "mappedBy": "topic"
     }
   }

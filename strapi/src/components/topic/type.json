@@ -1,0 +1,32 @@
+{
+    "collectionName": "components_topic_types",
+    "info": {
+      "displayName": "Type",
+      "description": ""
+    },
+    "options": {},
+    "attributes": {
+      "name": {
+        "type": "string",
+        "required": true
+      },
+      "abbreviation": {
+        "type": "string"
+      },
+      "description": {
+        "type": "richtext"
+      },
+      "symptoms": {
+        "type": "text",
+        "repeatable": true
+      },
+      "diagnosticFindings": {
+        "type": "text",
+        "repeatable": true
+      },
+      "causes": {
+        "type": "text",
+        "repeatable": true
+      }
+    }
+  }
