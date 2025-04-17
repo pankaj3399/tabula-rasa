@@ -33,11 +33,11 @@ const KnowledgeMap = ({ darkMode, setDarkMode }) => {
               percentage: topic.attributes?.percentage || topic.percentage || 0,
               topics: {
                 data: subtopicsData.map(subtopic => ({
-                  id: subtopic.documentId,
+                  id: subtopic.id,
                   attributes: {
                     name: subtopic.attributes?.title || subtopic.title,
                     // Temporary fix: Force ID 34 for "Dilated Cardiomyopathy Overview"
-                    id: subtopic.attributes?.title === 'Dilated Cardiomyopathy Overview' ? 34 : subtopic.documentId,
+                    id: subtopic.attributes?.title === 'Dilated Cardiomyopathy Overview' ? 34 : subtopic.id,
                   },
                 })),
               },
