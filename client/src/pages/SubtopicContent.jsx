@@ -1,46 +1,63 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Link, useParams } from 'react-router-dom';
-import axios from 'axios';
-import Header from '../components/Header';
-import { useAuth } from '../contexts/AuthContext';
-import ReactQuill from 'react-quill';
-import 'react-quill/dist/quill.snow.css';
+import React, { useState, useEffect, useRef } from "react";
+import { Link, useParams } from "react-router-dom";
+import axios from "axios";
+import Header from "../components/Header";
+import { useAuth } from "../contexts/AuthContext";
+import ReactQuill from "react-quill";
+import "react-quill/dist/quill.snow.css";
+
+const renderContent = (content) => {
+  return content.map((block, index) => {
+    if (block.type === "paragraph") {
+      return (
+        <p key={index} className="text-gray-300 mb-4">
+          {block.children.map((child, childIndex) => child.text).join("")}
+        </p>
+      );
+    }
+    return null;
+  });
+};
 
 const SubtopicContent = ({ darkMode, setDarkMode }) => {
   const { id } = useParams();
   const { currentUser } = useAuth();
   const [subtopic, setSubtopic] = useState(null);
-  const [notes, setNotes] = useState('');
-  const [activePage, setActivePage] = useState('Page 1');
+  const [notes, setNotes] = useState("");
+  const [activePage, setActivePage] = useState("Page 1");
   const [error, setError] = useState(null);
 
   useEffect(() => {
     console.log(`Fetching subtopic content for ID: ${id}`);
     axios
       .get(`${import.meta.env.VITE_API_URL}/subtopic-content/${id}`)
-      .then(response => {
-        console.log('Subtopic Content Response:', JSON.stringify(response.data, null, 2));
+      .then((response) => {
+        console.log(
+          "Subtopic Content Response:",
+          JSON.stringify(response.data, null, 2)
+        );
         if (!response.data.data) {
-          throw new Error('Subtopic not found');
+          throw new Error("Subtopic not found");
         }
         const subtopicData = response.data.data;
         setSubtopic({
           id: subtopicData.id,
-          title: subtopicData.attributes.title,
-          content: subtopicData.attributes.content,
+          title: subtopicData.title,
+          content: subtopicData.content,
         });
         setError(null);
       })
-      .catch(error => {
-        console.error('Error fetching subtopic content:', {
+      .catch((error) => {
+        console.error("Error fetching subtopic content:", {
           message: error.message,
-          response: error.response ? error.response.data : 'No response',
-          status: error.response ? error.response.status : 'Unknown',
+          response: error.response ? error.response.data : "No response",
+          status: error.response ? error.response.status : "Unknown",
         });
+        console.log(error, "hiiii");
         setError(
           error.response?.status === 404
-            ? 'Subtopic not found. Please check the ID or ensure it is published.'
-            : 'Failed to load subtopic content. Please try again later.'
+            ? "Subtopic not found. Please check the ID or ensure it is published."
+            : "Failed to load subtopic content. Please try again later."
         );
       });
 
@@ -49,39 +66,44 @@ const SubtopicContent = ({ darkMode, setDarkMode }) => {
         .get(`${import.meta.env.VITE_API_URL}/subtopic-notes`, {
           params: { userId: currentUser.id, subtopicId: id },
         })
-        .then(response => {
-          setNotes(response.data.notes || '');
+        .then((response) => {
+          setNotes(response.data.notes || "");
         })
-        .catch(error => {
-          console.error('Error fetching notes:', error);
+        .catch((error) => {
+          console.error("Error fetching notes:", error);
         });
     }
   }, [id, currentUser]);
 
-  const handleNotesChange = value => {
+  const handleNotesChange = (value) => {
     setNotes(value);
   };
 
   const saveNotes = async () => {
     if (!currentUser) {
-      alert('Please log in to save notes.');
+      alert("Please log in to save notes.");
       return;
     }
     try {
-      await axios.post(`${import.meta.env.VITE_API_URL}/update-subtopic-notes`, {
-        userId: currentUser.id,
-        subtopicId: id,
-        notes,
-      });
-      alert('Notes saved successfully!');
+      await axios.post(
+        `${import.meta.env.VITE_API_URL}/update-subtopic-notes`,
+        {
+          userId: currentUser.id,
+          subtopicId: id,
+          notes,
+        }
+      );
+      alert("Notes saved successfully!");
     } catch (error) {
-      console.error('Error saving notes:', error);
-      alert('Failed to save notes.');
+      console.error("Error saving notes:", error);
+      alert("Failed to save notes.");
     }
   };
 
-  if (error) return <div className="text-center py-10 text-red-500">{error}</div>;
-  if (!subtopic) return <div className="text-center py-10 text-white">Loading...</div>;
+  if (error)
+    return <div className="text-center py-10 text-red-500">{error}</div>;
+  if (!subtopic)
+    return <div className="text-center py-10 text-white">Loading...</div>;
 
   return (
     <div className="min-h-screen bg-gray-900 text-white">
@@ -119,12 +141,7 @@ const SubtopicContent = ({ darkMode, setDarkMode }) => {
 
           <div className="bg-gray-800 p-6 rounded-lg">
             <h2 className="text-xl font-bold mb-4">{subtopic.title}</h2>
-            <div className="mb-6">
-              <div
-                className="text-gray-300"
-                dangerouslySetInnerHTML={{ __html: subtopic.content }}
-              />
-            </div>
+            <div className="mb-6">{renderContent(subtopic.content)}</div>
           </div>
         </div>
 
@@ -144,7 +161,7 @@ const SubtopicContent = ({ darkMode, setDarkMode }) => {
               value={notes}
               onChange={handleNotesChange}
               className="bg-gray-700 text-white rounded-md"
-              style={{ height: '300px', marginBottom: '50px' }}
+              style={{ height: "300px", marginBottom: "50px" }}
             />
             <button
               onClick={saveNotes}
