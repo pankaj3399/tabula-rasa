@@ -53,7 +53,6 @@ const SubtopicContent = ({ darkMode, setDarkMode }) => {
           response: error.response ? error.response.data : "No response",
           status: error.response ? error.response.status : "Unknown",
         });
-        console.log(error, "hiiii");
         setError(
           error.response?.status === 404
             ? "Subtopic not found. Please check the ID or ensure it is published."
