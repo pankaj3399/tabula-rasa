@@ -20,17 +20,19 @@ const renderContent = (content) => {
 };
 
 const SubtopicContent = ({ darkMode, setDarkMode }) => {
-  const { id } = useParams();
+  const { id,slug } = useParams();
   const { currentUser } = useAuth();
   const [subtopic, setSubtopic] = useState(null);
   const [notes, setNotes] = useState("");
   const [activePage, setActivePage] = useState("Page 1");
   const [error, setError] = useState(null);
 
+  console.log(id,slug)
+
   useEffect(() => {
-    console.log(`Fetching subtopic content for ID: ${id}`);
+    console.log(`Fetching subtopic content for ID: ${id??slug}`);
     axios
-      .get(`${import.meta.env.VITE_API_URL}/subtopic-content/${id}`)
+      .get(`${import.meta.env.VITE_API_URL}/subtopic-content/${id??slug}`)
       .then((response) => {
         console.log(
           "Subtopic Content Response:",
@@ -40,8 +42,9 @@ const SubtopicContent = ({ darkMode, setDarkMode }) => {
           throw new Error("Subtopic not found");
         }
         const subtopicData = response.data.data;
+        console.log(subtopicData)
         setSubtopic({
-          id: subtopicData.id,
+          id: subtopicData.documentId,
           title: subtopicData.title,
           content: subtopicData.content,
         });
@@ -159,8 +162,8 @@ const SubtopicContent = ({ darkMode, setDarkMode }) => {
               theme="snow"
               value={notes}
               onChange={handleNotesChange}
-              className="bg-gray-700 text-white rounded-md"
-              style={{ height: "300px", marginBottom: "50px" }}
+              className="custom-quill bg-gray-700 text-white rounded-md"
+              style={{ minHeight: "150px", height:"auto",marginBottom:'20px'}}
             />
             <button
               onClick={saveNotes}

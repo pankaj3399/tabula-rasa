@@ -1,9 +1,16 @@
-import React, { useState } from 'react'; // Added useState for hamburger menu toggle
-import { Link, useLocation } from 'react-router-dom';
-import { Brain, Search, LogOut, Settings, Menu, X } from 'lucide-react'; // Added Menu and X icons for hamburger
-import { useAuth } from '../contexts/AuthContext';
+import React, { useState } from "react"; // Added useState for hamburger menu toggle
+import { Link, useLocation } from "react-router-dom";
+import { Brain, Search, LogOut, Settings, Menu, X } from "lucide-react"; // Added Menu and X icons for hamburger
+import { useAuth } from "../contexts/AuthContext";
 
-const Header = ({ openSignUpModal, openLoginModal, darkMode, setDarkMode }) => {
+const Header = ({
+  openSignUpModal,
+  openLoginModal,
+  darkMode,
+  setDarkMode,
+  search,
+  setSearch,
+}) => {
   const { currentUser, logout } = useAuth();
   const location = useLocation();
   const [isMenuOpen, setIsMenuOpen] = useState(false); // State for hamburger menu toggle
@@ -12,12 +19,18 @@ const Header = ({ openSignUpModal, openLoginModal, darkMode, setDarkMode }) => {
     try {
       await logout();
     } catch (err) {
-      console.error('Failed to log out:', err);
+      console.error("Failed to log out:", err);
     }
   };
 
   const toggleMenu = () => {
     setIsMenuOpen(!isMenuOpen);
+  };
+
+  const handleSearch = (e) => {
+    if (setSearch) {
+      setSearch(e.target.value);
+    }
   };
 
   return (
@@ -26,7 +39,10 @@ const Header = ({ openSignUpModal, openLoginModal, darkMode, setDarkMode }) => {
         <div className="flex justify-between items-center">
           <div className="flex items-center space-x-2">
             <Brain className="h-6 w-6 text-purple-600" />
-            <Link to={currentUser ? '/dashboard' : '/'} className="text-xl font-bold text-gray-900">
+            <Link
+              to={currentUser ? "/dashboard" : "/"}
+              className="text-xl font-bold text-gray-900"
+            >
               Tabula Rasa
             </Link>
           </div>
@@ -49,13 +65,15 @@ const Header = ({ openSignUpModal, openLoginModal, darkMode, setDarkMode }) => {
                 {/* Navigation Links */}
                 <nav
                   className={`${
-                    isMenuOpen ? 'flex' : 'hidden'
+                    isMenuOpen ? "flex" : "hidden"
                   } md:flex flex-col md:flex-row items-center space-y-2 md:space-y-0 md:space-x-1 absolute md:static top-14 left-0 right-0 bg-white md:bg-transparent p-4 md:p-0 border-b md:border-0 shadow-md md:shadow-none z-10`}
                 >
                   <Link
                     to="/dashboard"
                     className={`px-3 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-md flex items-center ${
-                      location.pathname === '/dashboard' ? 'bg-purple-100 text-purple-600' : ''
+                      location.pathname === "/dashboard"
+                        ? "bg-purple-100 text-purple-600"
+                        : ""
                     }`}
                     onClick={() => setIsMenuOpen(false)} // Close menu on link click
                   >
@@ -72,7 +90,9 @@ const Header = ({ openSignUpModal, openLoginModal, darkMode, setDarkMode }) => {
                   <Link
                     to="/knowledge-map"
                     className={`px-3 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-md flex items-center ${
-                      location.pathname === '/knowledge-map' ? 'bg-purple-100 text-purple-600' : ''
+                      location.pathname === "/knowledge-map"
+                        ? "bg-purple-100 text-purple-600"
+                        : ""
                     }`}
                     onClick={() => setIsMenuOpen(false)} // Close menu on link click
                   >
@@ -104,7 +124,12 @@ const Header = ({ openSignUpModal, openLoginModal, darkMode, setDarkMode }) => {
                       viewBox="0 0 24 24"
                       stroke="currentColor"
                     >
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M13 10V3L4 14h7v7l9-11h-7z"
+                      />
                     </svg>
                     Synaptic Sprint Practice
                   </Link>
@@ -134,6 +159,8 @@ const Header = ({ openSignUpModal, openLoginModal, darkMode, setDarkMode }) => {
                 <div className="relative hidden sm:block">
                   <input
                     type="text"
+                    value={search}
+                    onChange={handleSearch}
                     placeholder="Search topics..."
                     className="pl-8 pr-3 py-1.5 text-sm border rounded-md w-48 lg:w-64"
                   />
@@ -177,9 +204,7 @@ const Header = ({ openSignUpModal, openLoginModal, darkMode, setDarkMode }) => {
                   )}
                 </button>
 
-                <button
-                  className="p-1.5 rounded-full text-gray-500 hover:bg-gray-100 hidden md:block"
-                >
+                <button className="p-1.5 rounded-full text-gray-500 hover:bg-gray-100 hidden md:block">
                   <Settings className="h-4 w-4" />
                 </button>
 
