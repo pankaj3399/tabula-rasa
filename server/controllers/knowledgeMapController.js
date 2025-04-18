@@ -1,6 +1,8 @@
 const axios = require('axios');
 const mongoose = require('mongoose');
 const User = require('../models/User');
+const qs = require('qs');
+
 
 exports.getKnowledgeMap = async (req, res) => {
   const STRAPI_URL = process.env.STRAPI_URL;
@@ -56,10 +58,10 @@ exports.getSubtopicContent = async (req, res) => {
   const STRAPI_TOKEN = process.env.STRAPI_TOKEN;
 
   try {
-    const { id } = req.params;
-    console.log(`Attempting to fetch subtopic with ID: ${id} from ${STRAPI_URL}/api/subtopics/${id}`);
+    const { id,slug } = req.params;
+    console.log(`Attempting to fetch subtopic with ID: ${id} from ${STRAPI_URL}/api/subtopics/${id??slug}`);
     const response = await axios.get(
-      `${STRAPI_URL}/api/subtopics/${id}?populate=*&publicationState=live`,
+      `${STRAPI_URL}/api/subtopics/${id??slug}?populate=*&publicationState=live`,
       {
         headers: {
           Authorization: `Bearer ${STRAPI_TOKEN}`,
@@ -92,12 +94,11 @@ exports.getDueCards = async (req, res) => {
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
-
     const now = new Date();
     const dueCards = user.cardProgress
       .filter(card => card.dueDate <= now)
       .map(card => card.cardId.toString());
-
+    
     res.json({ dueCardIds: dueCards });
   } catch (error) {
     console.error('Error fetching due cards:', error.message);
@@ -115,8 +116,21 @@ exports.getCardsByIds = async (req, res) => {
       return res.status(400).json({ error: 'Invalid or empty card IDs' });
     }
 
+    const query = qs.stringify({
+      filters: {
+        id: {
+          $in: ids, // array of IDs
+        },
+      },
+      populate: ['topic'],
+      publicationState: 'live',
+    }, {
+      encodeValuesOnly: true,
+    });
+
+    console.log(`${STRAPI_URL}/api/cards?${query}`)
     const response = await axios.get(
-      `${STRAPI_URL}/api/cards?filters[id][$in]=${ids.join(',')}&populate=topic&publicationState=live`,
+      `${STRAPI_URL}/api/cards?${query}`,
       {
         headers: {
           Authorization: `Bearer ${STRAPI_TOKEN}`,

@@ -5,6 +5,25 @@ html {
   font-size: 100%; /* Base font size */
 }
 
+.custom-quill .ql-toolbar {
+  stroke: white;
+  border-color: #374151;     /* gray-700 */
+}
+
+.custom-quill .ql-toolbar .ql-stroke {
+  stroke: gray
+}
+
+.custom-quill .ql-toolbar .ql-picker,
+.custom-quill .ql-toolbar button {
+  color: black !important;
+  fill: black !important;
+}
+
+.custom-quill .ql-container {
+  min-height: 150px;
+}
+
 /* Responsive typography adjustments */
 @media screen and (min-width: 768px) {
   html {

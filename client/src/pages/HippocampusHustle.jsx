@@ -12,12 +12,12 @@ const HippocampusHustle = ({ darkMode, setDarkMode }) => {
   const [showAnswer, setShowAnswer] = useState(false);
   const [error, setError] = useState(null);
 
+
   useEffect(() => {
     if (!currentUser) {
       setError('Please log in to access Hippocampus Hustle.');
       return;
     }
-
     // Fetch due card IDs
     axios
       .get(`${import.meta.env.VITE_API_URL}/due-cards`, {
@@ -75,6 +75,7 @@ const HippocampusHustle = ({ darkMode, setDarkMode }) => {
   if (dueCards.length === 0) return <div className="text-center py-10 text-white">Loading...</div>;
 
   const currentCard = dueCards[currentCardIndex];
+  console.log(currentCard)
 
   return (
     <div className="min-h-screen bg-gray-900 text-white">
@@ -97,14 +98,14 @@ const HippocampusHustle = ({ darkMode, setDarkMode }) => {
           <div className="bg-gray-700 p-4 rounded-md mb-4">
             <div
               className="text-gray-300"
-              dangerouslySetInnerHTML={{ __html: currentCard.attributes.question_text }}
+              dangerouslySetInnerHTML={{ __html: currentCard.question_text }}
             />
             {showAnswer && (
               <>
-                <p className="mt-4"><strong>Answer:</strong> {currentCard.attributes.correct_answer}</p>
+                <p className="mt-4"><strong>Answer:</strong> {currentCard.correct_answer}</p>
                 <div
                   className="text-gray-300 mt-2"
-                  dangerouslySetInnerHTML={{ __html: currentCard.attributes.explanation }}
+                  dangerouslySetInnerHTML={{ __html: currentCard.explanation }}
                 />
               </>
             )}

@@ -7,6 +7,7 @@ const KnowledgeMap = ({ darkMode, setDarkMode }) => {
   const [systems, setSystems] = useState([]);
   const [expandedSystems, setExpandedSystems] = useState({});
   const [error, setError] = useState(null);
+  const [search,setSearch]=useState("");
 
   useEffect(() => {
     axios
@@ -71,11 +72,18 @@ const KnowledgeMap = ({ darkMode, setDarkMode }) => {
     }));
   };
 
+  const filteredSystems = search
+  ? systems.filter(system =>
+      system.attributes.name.toLowerCase().includes(search.toLowerCase())
+    )
+  : systems;
+  
+
   if (error) return <div className="text-center py-10 text-red-500">{error}</div>;
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Header darkMode={darkMode} setDarkMode={setDarkMode} />
+      <Header darkMode={darkMode} setDarkMode={setDarkMode} search={search} setSearch={setSearch}/>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <h1 className="text-2xl font-bold text-gray-900 mb-2">Medical Knowledge Map</h1>
         <p className="text-sm text-gray-600 mb-1">Select a system to explore topics</p>
@@ -83,7 +91,7 @@ const KnowledgeMap = ({ darkMode, setDarkMode }) => {
           *Percent allocation indicates relative importance of each system in medical education (sorted highest to lowest)
         </p>
 
-        {systems.map(system => (
+        {filteredSystems.map(system => (
           <div key={system.id} className="mb-4 bg-white rounded-lg shadow-sm border border-gray-200">
             <div
               className="flex items-center justify-between px-4 py-3 bg-white cursor-pointer hover:bg-gray-100"
