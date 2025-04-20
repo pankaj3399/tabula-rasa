@@ -8,6 +8,8 @@ router.get('/topics', knowledgeMapController.getKnowledgeMap);
 router.get('/topic-content/:slug', knowledgeMapController.getTopicContent);
 router.get('/subtopic-content/:id', knowledgeMapController.getSubtopicContent);
 router.get('/due-cards', knowledgeMapController.getDueCards);
+// Add GET /cards route
+router.get('/cards', knowledgeMapController.getCardsByIds); // Reuse getCardsByIds for GET
 router.post('/cards', knowledgeMapController.getCardsByIds);
 router.post('/update-card-progress', knowledgeMapController.updateCardProgress);
 router.post('/update-subtopic-notes', knowledgeMapController.updateSubtopicNotes);

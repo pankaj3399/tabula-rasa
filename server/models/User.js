@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 
 const cardProgressSchema = new mongoose.Schema({
-  cardId: { type: Number, required: true },
+  cardId: { type: String, required: true }, // Changed from Number to String
   dueDate: { type: Date, required: true },
   interval: { type: Number, default: 1 }, // Interval in days
   easeFactor: { type: Number, default: 2.5 }, // Ease factor for SRS
