@@ -11,13 +11,15 @@ const HippocampusHustle = ({ darkMode, setDarkMode }) => {
   const [currentCardIndex, setCurrentCardIndex] = useState(0);
   const [showAnswer, setShowAnswer] = useState(false);
   const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!currentUser) {
       setError("Please log in to access Hippocampus Hustle.");
+      setLoading(false);
       return;
     }
-
+  
     const initializeCards = async () => {
       try {
         // Fetch due card IDs
@@ -29,51 +31,72 @@ const HippocampusHustle = ({ darkMode, setDarkMode }) => {
         );
         let dueCardIds = dueResponse.data.dueCardIds;
         console.log("Due Card IDs:", dueCardIds);
-
-        if (dueCardIds.length === 0) {
-          // Initialize with cards from topic if none due
-          const topicResponse = await axios.get(
-            `${import.meta.env.VITE_API_URL}/topic-content/${slug}`
-          );
-          const cards = topicResponse.data.data[0]?.attributes?.cards?.data || [];
-          dueCardIds = cards.map((card) => card.id);
-
-          if (dueCardIds.length > 0) {
-            await axios.post(
-              `${import.meta.env.VITE_API_URL}/update-card-progress`,
-              {
-                userId: currentUser.id,
-                cardId: dueCardIds[0],
-                quality: 0,
-              }
+  
+        if (!dueCardIds || dueCardIds.length === 0) {
+          // If no due cards, try to get cards from the current topic
+          if (slug) {
+            const topicResponse = await axios.get(
+              `${import.meta.env.VITE_API_URL}/topic-content/${slug}`
             );
-            dueCardIds = [dueCardIds[0]];
-          } else {
-            setError("No cards available for this topic.");
-            return;
+            const cards = topicResponse.data.data[0]?.attributes?.cards?.data || [];
+            dueCardIds = cards.map((card) => card.id);
+          }
+  
+          // If still no cards, use default card with ID 1
+          if (!dueCardIds || dueCardIds.length === 0) {
+            dueCardIds = [1]; // Use numeric ID 1 as default
+          }
+          
+          // Initialize first card progress
+          await axios.post(
+            `${import.meta.env.VITE_API_URL}/update-card-progress`,
+            {
+              userId: currentUser.id,
+              cardId: dueCardIds[0],
+              quality: 0,
+            }
+          );
+        }
+  
+        // Fetch cards - use simple approach to avoid query parameter issues
+        try {
+          const cardsResponse = await axios.post(
+            `${import.meta.env.VITE_API_URL}/cards`,
+            { ids: dueCardIds }
+          );
+  
+          console.log("Fetched Cards:", cardsResponse.data.data);
+          const cards = cardsResponse.data.data.map((card) => ({
+            id: card.id,
+            ...card.attributes,
+          }));
+          
+          setDueCards(cards);
+          setLoading(false);
+        } catch (cardError) {
+          console.error("Error fetching cards:", cardError);
+          
+          // Fallback to fetch the default card with ID 1
+          try {
+            const fallbackResponse = await axios.get(
+              `${import.meta.env.VITE_API_URL}/cards?filters[id][$eq]=1`
+            );
+            
+            if (fallbackResponse.data.data && fallbackResponse.data.data.length > 0) {
+              const cards = fallbackResponse.data.data.map((card) => ({
+                id: card.id,
+                ...card.attributes,
+              }));
+              setDueCards(cards);
+              setLoading(false);
+            } else {
+              throw new Error("No cards found");
+            }
+          } catch (fallbackError) {
+            setError("Failed to load cards. Please try again later.");
+            setLoading(false);
           }
         }
-
-        // Fetch card content with GET request
-        const params = new URLSearchParams();
-        dueCardIds.forEach((id, index) => {
-          params.append("filters[id][$in]", id); // Simplified to a single array parameter
-        });
-        params.append("populate", "topic");
-        params.append("publicationState", "live");
-
-        const cardResponse = await axios.get(
-          `${import.meta.env.VITE_API_URL}/cards`,
-          {
-            params,
-          }
-        );
-        console.log("Fetched Cards:", cardResponse.data.data);
-        const cards = cardResponse.data.data.map((card) => ({
-          id: card.id,
-          ...card.attributes,
-        }));
-        setDueCards(cards);
       } catch (error) {
         console.error("Error in Hippocampus Hustle setup:", error);
         setError(
@@ -81,9 +104,10 @@ const HippocampusHustle = ({ darkMode, setDarkMode }) => {
             ? "Invalid request. Please check the card IDs."
             : "Failed to load due cards or initialize progress."
         );
+        setLoading(false);
       }
     };
-
+  
     initializeCards();
   }, [currentUser, slug]);
 
@@ -146,7 +170,8 @@ const HippocampusHustle = ({ darkMode, setDarkMode }) => {
         </div>
       </div>
     );
-  if (dueCards.length === 0)
+    
+  if (loading || dueCards.length === 0)
     return (
       <div className="min-h-screen bg-gray-900 text-white">
         <Header darkMode={darkMode} setDarkMode={setDarkMode} />
