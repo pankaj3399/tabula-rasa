@@ -1,38 +1,38 @@
 import type { Schema, Struct } from '@strapi/strapi';
 
-export interface TopicDiagnosis extends Struct.ComponentSchema {
-  collectionName: 'components_topic_diagnoses';
+export interface CommonTextItem extends Struct.ComponentSchema {
+  collectionName: 'components_common_text_items';
   info: {
-    description: '';
-    displayName: 'Diagnosis';
+    description: 'Single text item for repeatable lists';
+    displayName: 'Text Item';
   };
   attributes: {
-    overview: Schema.Attribute.RichText;
-    tools: Schema.Attribute.Text;
+    text: Schema.Attribute.String;
   };
 }
 
-export interface TopicType extends Struct.ComponentSchema {
-  collectionName: 'components_topic_types';
+export interface TopicDiseaseType extends Struct.ComponentSchema {
+  collectionName: 'components_topic_disease_types';
   info: {
-    description: '';
-    displayName: 'Type';
+    description: 'Container for different disease types (e.g., DCM, HCM, RCM)';
+    displayName: 'Disease Type';
   };
   attributes: {
     abbreviation: Schema.Attribute.String;
-    causes: Schema.Attribute.Text;
+    anchor_id: Schema.Attribute.String & Schema.Attribute.Required;
+    causes: Schema.Attribute.Component<'common.text-item', true>;
     description: Schema.Attribute.RichText;
-    diagnosticFindings: Schema.Attribute.Text;
+    diagnosticFindings: Schema.Attribute.Component<'common.text-item', true>;
     name: Schema.Attribute.String & Schema.Attribute.Required;
-    symptoms: Schema.Attribute.Text;
+    symptoms: Schema.Attribute.Component<'common.text-item', true>;
   };
 }
 
 declare module '@strapi/strapi' {
   export module Public {
     export interface ComponentSchemas {
-      'topic.diagnosis': TopicDiagnosis;
-      'topic.type': TopicType;
+      'common.text-item': CommonTextItem;
+      'topic.disease-type': TopicDiseaseType;
     }
   }
 }

@@ -398,6 +398,9 @@ export interface ApiCardCard extends Struct.CollectionTypeSchema {
     publishedAt: Schema.Attribute.DateTime;
     question_text: Schema.Attribute.RichText & Schema.Attribute.Required;
     scenario: Schema.Attribute.RichText;
+    slug: Schema.Attribute.String &
+      Schema.Attribute.Required &
+      Schema.Attribute.Unique;
     topic: Schema.Attribute.Relation<'manyToOne', 'api::topic.topic'>;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
@@ -408,7 +411,7 @@ export interface ApiCardCard extends Struct.CollectionTypeSchema {
 export interface ApiSubtopicSubtopic extends Struct.CollectionTypeSchema {
   collectionName: 'subtopics';
   info: {
-    description: '';
+    description: 'Represents smaller divisions within a Topic';
     displayName: 'Subtopic';
     pluralName: 'subtopics';
     singularName: 'subtopic';
@@ -428,8 +431,42 @@ export interface ApiSubtopicSubtopic extends Struct.CollectionTypeSchema {
     > &
       Schema.Attribute.Private;
     publishedAt: Schema.Attribute.DateTime;
-    title: Schema.Attribute.String;
+    slug: Schema.Attribute.UID<'title'>;
+    title: Schema.Attribute.String & Schema.Attribute.Required;
     topic: Schema.Attribute.Relation<'manyToOne', 'api::topic.topic'>;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+  };
+}
+
+export interface ApiSystemSystem extends Struct.CollectionTypeSchema {
+  collectionName: 'systems';
+  info: {
+    description: 'Represents the top-level PANCE blueprint categories';
+    displayName: 'System';
+    pluralName: 'systems';
+    singularName: 'system';
+  };
+  options: {
+    draftAndPublish: true;
+  };
+  attributes: {
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::system.system'
+    > &
+      Schema.Attribute.Private;
+    name: Schema.Attribute.String & Schema.Attribute.Required;
+    order: Schema.Attribute.Integer;
+    percentage: Schema.Attribute.Integer;
+    publishedAt: Schema.Attribute.DateTime;
+    slug: Schema.Attribute.UID<'name'> & Schema.Attribute.Required;
+    topics: Schema.Attribute.Relation<'oneToMany', 'api::topic.topic'>;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
@@ -439,7 +476,7 @@ export interface ApiSubtopicSubtopic extends Struct.CollectionTypeSchema {
 export interface ApiTopicTopic extends Struct.CollectionTypeSchema {
   collectionName: 'topics';
   info: {
-    description: '';
+    description: 'Represents specific PANCE topics within a System';
     displayName: 'Topic';
     pluralName: 'topics';
     singularName: 'topic';
@@ -452,35 +489,20 @@ export interface ApiTopicTopic extends Struct.CollectionTypeSchema {
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
-    description: Schema.Attribute.Text;
-    diagnosis: Schema.Attribute.Component<'topic.diagnosis', false>;
-    highYieldPoints: Schema.Attribute.RichText;
+    diagnosis_overview: Schema.Attribute.RichText;
+    diagnostic_tools: Schema.Attribute.Component<'common.text-item', true>;
+    highyieldPoints: Schema.Attribute.RichText;
     introduction: Schema.Attribute.RichText;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<'oneToMany', 'api::topic.topic'> &
       Schema.Attribute.Private;
-    order: Schema.Attribute.Integer &
-      Schema.Attribute.Required &
-      Schema.Attribute.SetMinMax<
-        {
-          min: 1;
-        },
-        number
-      >;
-    percentage: Schema.Attribute.Integer &
-      Schema.Attribute.Required &
-      Schema.Attribute.SetMinMax<
-        {
-          max: 100;
-          min: 0;
-        },
-        number
-      >;
+    management: Schema.Attribute.RichText & Schema.Attribute.Required;
     publishedAt: Schema.Attribute.DateTime;
     slug: Schema.Attribute.UID<'title'> & Schema.Attribute.Required;
     subtopics: Schema.Attribute.Relation<'oneToMany', 'api::subtopic.subtopic'>;
+    system: Schema.Attribute.Relation<'manyToOne', 'api::system.system'>;
     title: Schema.Attribute.String & Schema.Attribute.Required;
-    types: Schema.Attribute.Component<'topic.type', true>;
+    types: Schema.Attribute.Component<'topic.disease-type', true>;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
@@ -998,6 +1020,7 @@ declare module '@strapi/strapi' {
       'admin::user': AdminUser;
       'api::card.card': ApiCardCard;
       'api::subtopic.subtopic': ApiSubtopicSubtopic;
+      'api::system.system': ApiSystemSystem;
       'api::topic.topic': ApiTopicTopic;
       'plugin::content-releases.release': PluginContentReleasesRelease;
       'plugin::content-releases.release-action': PluginContentReleasesReleaseAction;

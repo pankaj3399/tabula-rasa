@@ -33,14 +33,38 @@ exports.getTopicContent = async (req, res) => {
 
   try {
     const { slug } = req.params;
+    // Updated to include types and subtopics
+    const query = qs.stringify({
+      filters: {
+        slug: {
+          $eq: slug
+        }
+      },
+      populate: {
+        types: {
+          populate: '*'
+        },
+        subtopics: {
+          populate: '*'
+        },
+        cards: {
+          populate: '*'
+        }
+      },
+      publicationState: 'live'
+    }, {
+      encodeValuesOnly: true
+    });
+
     const response = await axios.get(
-      `${STRAPI_URL}/api/topics?filters[slug][$eq]=${slug}&populate[types][populate]=*&populate[diagnosis][populate]=*&populate=cards&publicationState=live`,
+      `${STRAPI_URL}/api/topics?${query}`,
       {
         headers: {
           Authorization: `Bearer ${STRAPI_TOKEN}`,
         },
       }
     );
+    
     console.log('Topic Content Response:', response.data);
     if (!response.data.data || response.data.data.length === 0) {
       return res.status(404).json({ error: 'Topic not found' });
@@ -58,20 +82,59 @@ exports.getSubtopicContent = async (req, res) => {
 
   try {
     const { id, slug } = req.params;
-    console.log(`Attempting to fetch subtopic with ID: ${id} or slug: ${slug} from ${STRAPI_URL}/api/subtopics/${id ?? slug}`);
+    let endpoint;
+    
+    if (id && !isNaN(id)) {
+      // If it's a numeric ID
+      endpoint = `${STRAPI_URL}/api/subtopics/${id}?populate=*&publicationState=live`;
+    } else if (slug) {
+      // If it's a slug, we need to query it differently since slug is a UID field
+      const query = qs.stringify({
+        filters: {
+          slug: {
+            $eq: slug
+          }
+        },
+        populate: '*',
+        publicationState: 'live'
+      }, {
+        encodeValuesOnly: true
+      });
+      endpoint = `${STRAPI_URL}/api/subtopics?${query}`;
+    } else {
+      return res.status(400).json({ error: 'Either ID or slug is required' });
+    }
+    
+    console.log(`Attempting to fetch subtopic from: ${endpoint}`);
+    
     const response = await axios.get(
-      `${STRAPI_URL}/api/subtopics/${id ?? slug}?populate=*&publicationState=live`,
+      endpoint,
       {
         headers: {
           Authorization: `Bearer ${STRAPI_TOKEN}`,
         },
       }
     );
+    
     console.log('Subtopic Content Response:', JSON.stringify(response.data, null, 2));
-    if (!response.data.data) {
-      return res.status(404).json({ error: `Subtopic with ID ${id} or slug ${slug} not found` });
+    
+    // Handle different response formats depending on whether we used ID or slug
+    let subtopicData;
+    if (slug && !id) {
+      // When using slug filtering, we get an array
+      if (!response.data.data || response.data.data.length === 0) {
+        return res.status(404).json({ error: `Subtopic with slug ${slug} not found` });
+      }
+      subtopicData = response.data.data[0]; // Take the first match
+    } else {
+      // When using ID, we get a single object
+      if (!response.data.data) {
+        return res.status(404).json({ error: `Subtopic with ID ${id} not found` });
+      }
+      subtopicData = response.data.data;
     }
-    res.json(response.data);
+    
+    res.json({ data: subtopicData });
   } catch (error) {
     console.error('Error fetching subtopic content:', {
       message: error.message,
@@ -139,13 +202,13 @@ exports.getCardsByIds = async (req, res) => {
     }
 
     if (ids.length === 0) {
-      // If no valid IDs provided, return a default card with ID 1
-      console.log('No valid card IDs provided, returning default card');
+      // If no valid IDs provided, try to find a default card
+      console.log('No valid card IDs provided, looking for a default card');
       const query = qs.stringify({
-        filters: {
-          id: 1
-        },
         populate: 'topic',
+        pagination: {
+          limit: 1
+        },
         publicationState: 'live',
       }, {
         encodeValuesOnly: true,
@@ -190,10 +253,10 @@ exports.getCardsByIds = async (req, res) => {
   } catch (error) {
     console.error('Error fetching cards:', error.response ? error.response.data : error.message);
     
-    // Fallback to return default card if error occurs
+    // Fallback to return any card if error occurs
     try {
       const defaultQuery = qs.stringify({
-        filters: { id: 1 },
+        pagination: { limit: 1 },
         populate: 'topic',
         publicationState: 'live',
       }, { encodeValuesOnly: true });
@@ -300,5 +363,95 @@ exports.getSubtopicNotes = async (req, res) => {
   } catch (error) {
     console.error('Error fetching subtopic notes:', error.message);
     res.status(500).json({ error: 'Failed to fetch subtopic notes' });
+  }
+};
+
+exports.getSystems = async (req, res) => {
+  const STRAPI_URL = process.env.STRAPI_URL;
+  const STRAPI_TOKEN = process.env.STRAPI_TOKEN;
+
+  try {
+    if (!STRAPI_URL || !STRAPI_TOKEN) {
+      throw new Error('STRAPI_URL or STRAPI_TOKEN is not defined in environment variables');
+    }
+    
+    // Updated query to include topics with their subtopics
+    const query = qs.stringify({
+      populate: {
+        topics: {
+          populate: ['subtopics']
+        }
+      },
+      publicationState: 'live',
+      sort: ['order:asc']
+    }, {
+      encodeValuesOnly: true
+    });
+    
+    // Fetch systems from Strapi
+    const response = await axios.get(
+      `${STRAPI_URL}/api/systems?${query}`,
+      {
+        headers: {
+          Authorization: `Bearer ${STRAPI_TOKEN}`,
+        },
+      }
+    );
+    
+    console.log('Strapi Response for /api/systems:', response.data);
+    
+    // If successful, return the data
+    res.json(response.data);
+  } catch (error) {
+    console.error('Error fetching systems:', error.response ? error.response.data : error.message);
+    
+    // Fallback: If systems endpoint fails, try the topics endpoint
+    try {
+      console.log('Falling back to topics endpoint');
+      // Using the existing getKnowledgeMap logic as a fallback
+      const fallbackResponse = await axios.get(
+        `${STRAPI_URL}/api/topics?populate=subtopics&publicationState=live&sort=order:asc`,
+        {
+          headers: {
+            Authorization: `Bearer ${STRAPI_TOKEN}`,
+          },
+        }
+      );
+      
+      console.log('Fallback response from topics endpoint:', fallbackResponse.data);
+      
+      // Map topics to a systems-like structure
+      const mappedData = {
+        data: fallbackResponse.data.data.map(topic => {
+          return {
+            id: topic.id,
+            attributes: {
+              name: topic.attributes.title,
+              percentage: topic.attributes.percentage || 0,
+              order: topic.attributes.order || 0,
+              topics: {
+                data: (topic.attributes.subtopics?.data || []).map(subtopic => ({
+                  id: subtopic.id,
+                  attributes: {
+                    name: subtopic.attributes.title,
+                    title: subtopic.attributes.title,
+                    slug: subtopic.attributes.slug
+                  }
+                }))
+              }
+            }
+          };
+        })
+      };
+      
+      res.json(mappedData);
+    } catch (fallbackError) {
+      console.error('Fallback also failed:', fallbackError.message);
+      res.status(500).json({ 
+        error: 'Failed to fetch systems or topics data',
+        details: error.message,
+        fallbackError: fallbackError.message
+      });
+    }
   }
 };

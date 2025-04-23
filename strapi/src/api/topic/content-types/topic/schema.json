@@ -5,7 +5,7 @@
     "singularName": "topic",
     "pluralName": "topics",
     "displayName": "Topic",
-    "description": ""
+    "description": "Represents specific PANCE topics within a System"
   },
   "options": {
     "draftAndPublish": true
@@ -20,46 +20,45 @@
       "targetField": "title",
       "required": true
     },
-    "description": {
-      "type": "text"
-    },
-    "percentage": {
-      "type": "integer",
-      "required": true,
-      "min": 0,
-      "max": 100
-    },
-    "order": {
-      "type": "integer",
-      "required": true,
-      "min": 1
-    },
     "introduction": {
       "type": "richtext"
     },
     "types": {
       "type": "component",
       "repeatable": true,
-      "component": "topic.type"
+      "component": "topic.disease-type"
     },
-    "diagnosis": {
-      "type": "component",
-      "repeatable": false,
-      "component": "topic.diagnosis"
-    },
-    "highYieldPoints": {
+    "diagnosis_overview": {
       "type": "richtext"
     },
-    "subtopics": {
+    "diagnostic_tools": {
+      "type": "component",
+      "repeatable": true,
+      "component": "common.text-item"
+    },
+    "management": {
+      "type": "richtext",
+      "required": true
+    },
+    "highyieldPoints": {
+      "type": "richtext"
+    },
+    "system": {
       "type": "relation",
-      "relation": "oneToMany",
-      "target": "api::subtopic.subtopic",
-      "mappedBy": "topic"
+      "relation": "manyToOne",
+      "target": "api::system.system",
+      "inversedBy": "topics"
     },
     "cards": {
       "type": "relation",
       "relation": "oneToMany",
       "target": "api::card.card",
+      "mappedBy": "topic"
+    },
+    "subtopics": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::subtopic.subtopic",
       "mappedBy": "topic"
     }
   }
