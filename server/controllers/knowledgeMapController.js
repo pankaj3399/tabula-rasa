@@ -326,46 +326,6 @@ exports.updateCardProgress = async (req, res) => {
   }
 };
 
-exports.updateSubtopicNotes = async (req, res) => {
-  try {
-    const { userId, subtopicId, notes } = req.body;
-    const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-
-    const note = user.notes.find(n => n.subtopicId === subtopicId);
-    if (note) {
-      note.content = notes;
-      note.updatedAt = new Date();
-    } else {
-      user.notes.push({ subtopicId, content: notes });
-    }
-
-    await user.save();
-    res.json({ message: 'Notes updated successfully' });
-  } catch (error) {
-    console.error('Error updating subtopic notes:', error.message);
-    res.status(500).json({ error: 'Failed to update subtopic notes' });
-  }
-};
-
-exports.getSubtopicNotes = async (req, res) => {
-  try {
-    const { userId, subtopicId } = req.query;
-    const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-
-    const note = user.notes.find(n => n.subtopicId === subtopicId);
-    res.json({ notes: note ? note.content : '' });
-  } catch (error) {
-    console.error('Error fetching subtopic notes:', error.message);
-    res.status(500).json({ error: 'Failed to fetch subtopic notes' });
-  }
-};
-
 exports.getSystems = async (req, res) => {
   const STRAPI_URL = process.env.STRAPI_URL;
   const STRAPI_TOKEN = process.env.STRAPI_TOKEN;
@@ -453,5 +413,59 @@ exports.getSystems = async (req, res) => {
         fallbackError: fallbackError.message
       });
     }
+  }
+};
+
+// Rename these functions from subtopic-specific to more generic
+exports.updateNotes = async (req, res) => {
+  try {
+    const { userId, contentId, contentType, notes } = req.body;
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Find note by contentId and contentType
+    const note = user.notes.find(n => 
+      n.contentId === contentId && n.contentType === contentType
+    );
+    
+    if (note) {
+      note.content = notes;
+      note.updatedAt = new Date();
+    } else {
+      user.notes.push({ 
+        contentId, 
+        contentType,
+        content: notes,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      });
+    }
+
+    await user.save();
+    res.json({ message: 'Notes updated successfully' });
+  } catch (error) {
+    console.error('Error updating notes:', error.message);
+    res.status(500).json({ error: 'Failed to update notes' });
+  }
+};
+
+exports.getNotes = async (req, res) => {
+  try {
+    const { userId, contentId, contentType } = req.query;
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const note = user.notes.find(n => 
+      n.contentId === contentId && n.contentType === contentType
+    );
+    
+    res.json({ notes: note ? note.content : '' });
+  } catch (error) {
+    console.error('Error fetching notes:', error.message);
+    res.status(500).json({ error: 'Failed to fetch notes' });
   }
 };

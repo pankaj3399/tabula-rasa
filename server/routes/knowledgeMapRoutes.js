@@ -20,7 +20,7 @@ router.post('/cards', knowledgeMapController.getCardsByIds);
 router.post('/update-card-progress', knowledgeMapController.updateCardProgress);
 
 // Notes routes
-router.post('/update-subtopic-notes', knowledgeMapController.updateSubtopicNotes);
-router.get('/subtopic-notes', knowledgeMapController.getSubtopicNotes);
+router.post('/update-notes', knowledgeMapController.updateNotes);
+router.get('/notes', knowledgeMapController.getNotes);
 
 module.exports = router;
