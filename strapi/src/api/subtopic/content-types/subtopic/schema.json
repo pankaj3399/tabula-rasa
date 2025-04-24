@@ -5,14 +5,19 @@
     "singularName": "subtopic",
     "pluralName": "subtopics",
     "displayName": "Subtopic",
-    "description": ""
+    "description": "Represents smaller divisions within a Topic"
   },
   "options": {
     "draftAndPublish": true
   },
   "attributes": {
     "title": {
-      "type": "string"
+      "type": "string",
+      "required": true
+    },
+    "slug": {
+      "type": "uid",
+      "targetField": "title"
     },
     "content": {
       "type": "blocks"

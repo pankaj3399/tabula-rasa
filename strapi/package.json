@@ -20,6 +20,7 @@
     "@strapi/provider-upload-cloudinary": "^5.11.3",
     "@strapi/strapi": "5.11.2",
     "better-sqlite3": "11.3.0",
+    "brew": "^0.0.8",
     "cloudinary": "^2.6.0",
     "pg": "^8.14.1",
     "react": "^18.0.0",

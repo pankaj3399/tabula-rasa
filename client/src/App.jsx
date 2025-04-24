@@ -3,9 +3,10 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import Home from './pages/Home';
 import Dashboard from './pages/Dashboard';
 import KnowledgeMap from './pages/KnowledgeMap';
-import SubtopicContent from './pages/SubtopicContent';
+import SubtopicContent from './pages/TopicContent';
 import HippocampusHustle from './pages/HippocampusHustle';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import TopicContent from './pages/TopicContent';
 
 const ProtectedRoute = ({ children }) => {
   const { currentUser } = useAuth();
@@ -39,18 +40,11 @@ const App = () => {
           path="/topic/:slug"
           element={
             <ProtectedRoute>
-              <SubtopicContent darkMode={darkMode} setDarkMode={setDarkMode} />
+              <TopicContent darkMode={darkMode} setDarkMode={setDarkMode} />
             </ProtectedRoute>
           }
         />
-        <Route
-          path="/subtopic/:id"
-          element={
-            <ProtectedRoute>
-              <SubtopicContent darkMode={darkMode} setDarkMode={setDarkMode} />
-            </ProtectedRoute>
-          }
-        />
+
         <Route
           path="/hippocampus-hustle/:slug"
           element={

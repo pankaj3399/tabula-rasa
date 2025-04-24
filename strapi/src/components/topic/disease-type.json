@@ -1,0 +1,39 @@
+{
+    "collectionName": "components_topic_disease_types",
+    "info": {
+      "displayName": "Disease Type",
+      "description": "Container for different disease types (e.g., DCM, HCM, RCM)"
+    },
+    "options": {},
+    "attributes": {
+      "name": {
+        "type": "string",
+        "required": true
+      },
+      "abbreviation": {
+        "type": "string"
+      },
+      "anchor_id": {
+        "type": "string",
+        "required": true
+      },
+      "description": {
+        "type": "richtext"
+      },
+      "symptoms": {
+        "type": "component",
+        "repeatable": true,
+        "component": "common.text-item"
+      },
+      "diagnosticFindings": {
+        "type": "component",
+        "repeatable": true,
+        "component": "common.text-item"
+      },
+      "causes": {
+        "type": "component",
+        "repeatable": true,
+        "component": "common.text-item"
+      }
+    }
+  }

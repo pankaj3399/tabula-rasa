@@ -16,12 +16,14 @@ const userSchema = new mongoose.Schema({
   createdAt: { type: Date, default: Date.now },
   notes: [
     {
-      subtopicId: { type: String },
+      contentId: { type: String },
+      contentType: { type: String },
       content: { type: String },
       updatedAt: { type: Date, default: Date.now },
+      createdAt: { type: Date, default: Date.now }
     },
   ],
-  cardProgress: [cardProgressSchema], // Store SRS progress for each card
+  cardProgress: [cardProgressSchema],
 });
 
 module.exports = mongoose.model('User', userSchema);
