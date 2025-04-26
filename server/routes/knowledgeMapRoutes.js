@@ -8,19 +8,20 @@ router.get('/topics', knowledgeMapController.getKnowledgeMap);
 
 // Topic routes
 router.get('/topic-content/:slug', knowledgeMapController.getTopicContent);
-
-// Subtopic routes - support both ID and slug
+router.get('/topic-cards-due/:slug', knowledgeMapController.getTopicCardsDueForReview);
 router.get('/subtopic-content/:id', knowledgeMapController.getSubtopicContent);
 router.get('/subtopic-content/slug/:slug', knowledgeMapController.getSubtopicContent);
 
 // Card routes
 router.get('/due-cards', knowledgeMapController.getDueCards);
-router.get('/cards', knowledgeMapController.getCardsByIds);
-router.post('/cards', knowledgeMapController.getCardsByIds);
+router.post('/cards', knowledgeMapController.getTopicCards);
 router.post('/update-card-progress', knowledgeMapController.updateCardProgress);
+router.get('/user-card-progress', knowledgeMapController.getUserCardProgress);
 
 // Notes routes
 router.post('/update-notes', knowledgeMapController.updateNotes);
 router.get('/notes', knowledgeMapController.getNotes);
+// Study Settings routes
+router.post('/study-settings', knowledgeMapController.setStudySessionSettings);
 
 module.exports = router;

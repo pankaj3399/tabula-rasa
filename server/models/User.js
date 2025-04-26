@@ -24,6 +24,11 @@ const userSchema = new mongoose.Schema({
     },
   ],
   cardProgress: [cardProgressSchema],
+  studySettings: {
+    cardLimit: { type: Number, default: 10 },
+    includeNewCards: { type: Boolean, default: true },
+    enableTimer: { type: Boolean, default: false }
+  }
 });
 
 module.exports = mongoose.model('User', userSchema);
