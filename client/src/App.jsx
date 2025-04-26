@@ -7,6 +7,7 @@ import SubtopicContent from './pages/TopicContent';
 import HippocampusHustle from './pages/HippocampusHustle';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import TopicContent from './pages/TopicContent';
+import StudyDashboard from './components/StudyDashboard';
 
 const ProtectedRoute = ({ children }) => {
   const { currentUser } = useAuth();
@@ -53,6 +54,14 @@ const App = () => {
             </ProtectedRoute>
           }
         />
+        <Route
+  path="/study-dashboard/:slug"
+  element={
+    <ProtectedRoute>
+      <StudyDashboard darkMode={darkMode} setDarkMode={setDarkMode} />
+    </ProtectedRoute>
+  }
+/>
       </Routes>
     </AuthProvider>
   );
