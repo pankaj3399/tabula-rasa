@@ -34,14 +34,37 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
     diagnosis: false,
     highYield: false,
   });
-
+  const [viewMode, setViewMode] = useState('both'); // 'both', 'notes', 'summary'
+  const [saveStatus, setSaveStatus] = useState('idle'); // 'idle', 'saving', 'saved', 'error'
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  
   // Refs for scrolling to sections
   const introductionRef = useRef(null);
   const typesRef = useRef(null);
   const diagnosisRef = useRef(null);
   const highYieldRef = useRef(null);
+  const autoSaveTimerRef = useRef(null);
 
   const subtopicId = id || slug;
+
+  // Rich text editor modules configuration
+  const modules = {
+    toolbar: [
+      [{ 'header': [1, 2, false] }],
+      ['bold', 'italic', 'underline', 'strike', 'blockquote'],
+      [{'list': 'ordered'}, {'list': 'bullet'}, {'indent': '-1'}, {'indent': '+1'}],
+      ['link'],
+      ['clean']
+    ],
+  };
+
+  // Rich text editor formats
+  const formats = [
+    'header',
+    'bold', 'italic', 'underline', 'strike', 'blockquote',
+    'list', 'bullet', 'indent',
+    'link'
+  ];
 
   // Function to toggle accordion sections
   const toggleSection = (section) => {
@@ -71,6 +94,79 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
     }
   };
 
+  // Function to toggle view mode
+  const toggleViewMode = () => {
+    const modes = ['both', 'notes', 'summary'];
+    const currentIndex = modes.indexOf(viewMode);
+    const nextIndex = (currentIndex + 1) % modes.length;
+    setViewMode(modes[nextIndex]);
+  };
+
+  // Get view mode display name
+  const getViewModeDisplay = () => {
+    switch(viewMode) {
+      case 'both': return 'Summary & Notes';
+      case 'notes': return 'Notes Only';
+      case 'summary': return 'Summary Only';
+      default: return 'Summary & Notes';
+    }
+  };
+
+  // Auto-save function
+  const autoSaveNotes = async () => {
+    if (!currentUser || !hasUnsavedChanges) return;
+    
+    try {
+      setSaveStatus('saving');
+      
+      // Check if we're using relative or absolute URL in the API calls
+      const baseUrl = import.meta.env.VITE_API_URL;
+      const notesEndpoint = baseUrl.includes('/api')
+        ? '/update-notes'
+        : '/api/update-notes';
+
+      await axios.post(`${baseUrl}${notesEndpoint}`, {
+        userId: currentUser.id,
+        contentId: slug,
+        contentType: 'topic',
+        notes,
+      });
+      
+      setSaveStatus('saved');
+      setHasUnsavedChanges(false);
+      
+      // Reset status to idle after a few seconds
+      setTimeout(() => {
+        if (setSaveStatus) setSaveStatus('idle');
+      }, 3000);
+    } catch (error) {
+      console.error('Error auto-saving notes:', error);
+      setSaveStatus('error');
+    }
+  };
+
+  // Trigger auto-save with debounce
+  useEffect(() => {
+    if (!currentUser || !hasUnsavedChanges) return;
+    
+    // Clear any existing timer
+    if (autoSaveTimerRef.current) {
+      clearTimeout(autoSaveTimerRef.current);
+    }
+    
+    // Set new timer for auto-save (2 seconds after typing stops)
+    autoSaveTimerRef.current = setTimeout(() => {
+      autoSaveNotes();
+    }, 2000);
+    
+    // Cleanup function
+    return () => {
+      if (autoSaveTimerRef.current) {
+        clearTimeout(autoSaveTimerRef.current);
+      }
+    };
+  }, [notes, hasUnsavedChanges, currentUser]);
+
   useEffect(() => {
     console.log(`Fetching topic content for slug: ${slug}`);
     setLoading(true);
@@ -98,7 +194,7 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
         // Update this section to match the actual data structure from the API
         setSubtopic({
           id: topicData.id,
-          title: topicData.title, // Direct access instead of through attributes
+          title: topicData.title,
           content: [
             {
               type: 'paragraph',
@@ -142,6 +238,13 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
           // Don't set an error state here to allow the page to load even if notes fail
         });
     }
+
+    // Cleanup function to cancel any pending auto-save when unmounting
+    return () => {
+      if (autoSaveTimerRef.current) {
+        clearTimeout(autoSaveTimerRef.current);
+      }
+    };
   }, [slug, currentUser]);
 
   const saveNotes = async () => {
@@ -151,6 +254,8 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
     }
 
     try {
+      setSaveStatus('saving');
+      
       // Check if we're using relative or absolute URL in the API calls
       const baseUrl = import.meta.env.VITE_API_URL;
       const notesEndpoint = baseUrl.includes('/api')
@@ -163,15 +268,66 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
         contentType: 'topic',
         notes,
       });
-      alert('Notes saved successfully!');
+      
+      setSaveStatus('saved');
+      setHasUnsavedChanges(false);
+      
+      // Reset status to idle after a few seconds
+      setTimeout(() => {
+        if (setSaveStatus) setSaveStatus('idle');
+      }, 3000);
     } catch (error) {
       console.error('Error saving notes:', error);
+      setSaveStatus('error');
       alert(`Failed to save notes: ${error.response?.status || error.message}`);
     }
   };
 
   const handleNotesChange = (value) => {
     setNotes(value);
+    setHasUnsavedChanges(true);
+    if (saveStatus === 'saved' || saveStatus === 'error') {
+      setSaveStatus('idle');
+    }
+  };
+
+  // Render save status indicator
+  const renderSaveStatus = () => {
+    switch (saveStatus) {
+      case 'saving':
+        return (
+          <div className="flex items-center text-gray-300 text-sm ml-2">
+            <svg className="animate-spin h-4 w-4 mr-1 text-blue-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            Saving...
+          </div>
+        );
+      case 'saved':
+        return (
+          <div className="flex items-center text-green-400 text-sm ml-2">
+            <svg className="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
+            </svg>
+            Saved
+          </div>
+        );
+      case 'error':
+        return (
+          <div className="flex items-center text-red-400 text-sm ml-2">
+            <svg className="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            Error saving
+          </div>
+        );
+      case 'idle':
+      default:
+        return hasUnsavedChanges ? (
+          <div className="text-blue-400 text-sm ml-2">Unsaved changes</div>
+        ) : null;
+    }
   };
 
   if (error) {
@@ -221,8 +377,78 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
 
   return (
     <div className='min-h-screen bg-gray-900 text-white'>
+      <style jsx>{`
+        /* Quill editor custom styling */
+        .quill-custom .ql-toolbar {
+          background-color: #374151;
+          border-color: #4b5563;
+          border-top-left-radius: 0.375rem;
+          border-top-right-radius: 0.375rem;
+        }
+        
+        .quill-custom .ql-container {
+          background-color: #1f2937;
+          border-color: #4b5563;
+          border-bottom-left-radius: 0.375rem;
+          border-bottom-right-radius: 0.375rem;
+          font-family: inherit;
+          font-size: 1rem;
+        }
+        
+        .quill-custom .ql-editor {
+          color: #e5e7eb;
+          min-height: 200px;
+        }
+        
+        .quill-custom .ql-stroke {
+          stroke: #9ca3af;
+        }
+        
+        .quill-custom .ql-fill {
+          fill: #9ca3af;
+        }
+        
+        .quill-custom .ql-picker {
+          color: #9ca3af;
+        }
+        
+        .quill-custom .ql-picker-options {
+          background-color: #374151;
+          border-color: #4b5563;
+        }
+        
+        .quill-custom .ql-toolbar button:hover .ql-stroke,
+        .quill-custom .ql-toolbar button.ql-active .ql-stroke {
+          stroke: #60a5fa;
+        }
+        
+        .quill-custom .ql-toolbar button:hover .ql-fill,
+        .quill-custom .ql-toolbar button.ql-active .ql-fill {
+          fill: #60a5fa;
+        }
+        
+        .quill-custom .ql-picker.ql-expanded .ql-picker-label {
+          color: #60a5fa;
+          border-color: #60a5fa;
+        }
+        
+        /* Content transitions */
+        .section-content {
+          transition: all 0.3s ease;
+        }
+        
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+          .quill-custom .ql-editor {
+            max-height: 50vh;
+          }
+        }
+      `}</style>
+      
       <Header darkMode={darkMode} setDarkMode={setDarkMode} />
-      <div className='flex justify-between items-center px-4 py-2 bg-gray-800 border-b border-gray-700'>
+      
+      {/* Navigation Bar */}
+      <div className='flex justify-between items-center px-4 py-3 bg-gray-800 border-b border-gray-700 sticky top-0 z-10'>
         <Link
           to='/knowledge-map'
           className='text-blue-400 hover:text-blue-300 transition flex items-center'
@@ -241,8 +467,30 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
           </svg>
           Back to Mind Map
         </Link>
+        
         <div className='flex items-center space-x-4'>
-          <span className='text-gray-400'>Tabula Rasa</span>
+          {/* View Toggle Button */}
+          <button 
+            onClick={toggleViewMode}
+            className='bg-indigo-700 hover:bg-indigo-600 text-white px-4 py-2 rounded-md text-sm transition flex items-center'
+          >
+            <svg
+              xmlns='http://www.w3.org/2000/svg'
+              className='h-4 w-4 mr-2'
+              fill='none'
+              viewBox='0 0 24 24'
+              stroke='currentColor'
+            >
+              <path
+                strokeLinecap='round'
+                strokeLinejoin='round'
+                strokeWidth={2}
+                d='M4 6h16M4 12h16m-7 6h7'
+              />
+            </svg>
+            Toggle View [{getViewModeDisplay()}]
+          </button>
+                    
           <Link
             to={`/study-dashboard/${slug}`}
             className='bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md flex items-center transition'
@@ -261,113 +509,119 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
                 d='M13 10V3L4 14h7v7l9-11h-7z'
               />
             </svg>
-            Hippocampus Hustle
+            <span className='hidden sm:inline'>Hippocampus Hustle</span>
+            <span className='sm:hidden'>Study</span>
           </Link>
         </div>
       </div>
 
-      <div className='flex'>
-        {/* Left Sidebar Navigation */}
-        <div className='w-48 min-h-screen bg-gray-800 border-r border-gray-700 p-4'>
-          <div className='mb-4'>
-            <h3 className='text-sm font-semibold text-gray-400 mb-2'>
-              JUMP TO:
-            </h3>
-            <nav>
-              <ul className='space-y-1'>
-                <li>
-                  <button
-                    onClick={() => scrollToSection('introduction')}
-                    className={`w-full text-left py-1 px-2 rounded ${
-                      activeSection === 'introduction'
-                        ? 'bg-gray-700 text-blue-400'
-                        : 'text-gray-300 hover:bg-gray-700'
-                    }`}
-                  >
-                    Introduction
-                  </button>
-                </li>
-                <li>
-                  <button
-                    onClick={() => scrollToSection('types')}
-                    className={`w-full text-left py-1 px-2 rounded ${
-                      activeSection === 'types'
-                        ? 'bg-gray-700 text-blue-400'
-                        : 'text-gray-300 hover:bg-gray-700'
-                    }`}
-                  >
-                    Types
-                  </button>
-                </li>
-                {subtopic.types &&
-                  subtopic.types.map((type) => (
-                    <li key={type.id}>
-                      <button className='w-full text-left py-1 px-2 pl-6 rounded text-gray-400 hover:bg-gray-700 text-sm'>
-                        {type.abbreviation || type.name}
-                      </button>
-                    </li>
-                  ))}
-                <li>
-                  <button
-                    onClick={() => scrollToSection('diagnosis')}
-                    className={`w-full text-left py-1 px-2 rounded ${
-                      activeSection === 'diagnosis'
-                        ? 'bg-gray-700 text-blue-400'
-                        : 'text-gray-300 hover:bg-gray-700'
-                    }`}
-                  >
-                    Diagnosis
-                  </button>
-                </li>
-                <li>
-                  <button
-                    onClick={() => scrollToSection('management')}
-                    className={`w-full text-left py-1 px-2 rounded ${
-                      activeSection === 'management'
-                        ? 'bg-gray-700 text-blue-400'
-                        : 'text-gray-300 hover:bg-gray-700'
-                    }`}
-                  >
-                    Management
-                  </button>
-                </li>
-                <li>
-                  <button
-                    onClick={() => scrollToSection('highYield')}
-                    className={`w-full text-left py-1 px-2 rounded ${
-                      activeSection === 'highYield'
-                        ? 'bg-gray-700 text-blue-400'
-                        : 'text-gray-300 hover:bg-gray-700'
-                    }`}
-                  >
-                    High-Yield
-                  </button>
-                </li>
-              </ul>
-            </nav>
+      <div className='flex flex-col md:flex-row'>
+        {/* Left Sidebar Navigation - Show only in summary or both modes */}
+        {(viewMode === 'both' || viewMode === 'summary') && (
+          <div className='w-full md:w-48 bg-gray-800 border-r border-gray-700 p-4 md:min-h-screen'>
+            <div className='mb-4'>
+              <h3 className='text-sm font-semibold text-gray-400 mb-2'>
+                JUMP TO:
+              </h3>
+              <nav className='flex md:block overflow-x-auto md:overflow-visible pb-2 md:pb-0'>
+                <ul className='flex md:block space-x-2 md:space-x-0 md:space-y-1'>
+                  <li>
+                    <button
+                      onClick={() => scrollToSection('introduction')}
+                      className={`whitespace-nowrap text-left py-1 px-2 rounded ${
+                        activeSection === 'introduction'
+                          ? 'bg-gray-700 text-blue-400'
+                          : 'text-gray-300 hover:bg-gray-700'
+                      }`}
+                    >
+                      Introduction
+                    </button>
+                  </li>
+                  <li>
+                    <button
+                      onClick={() => scrollToSection('types')}
+                      className={`whitespace-nowrap text-left py-1 px-2 rounded ${
+                        activeSection === 'types'
+                          ? 'bg-gray-700 text-blue-400'
+                          : 'text-gray-300 hover:bg-gray-700'
+                      }`}
+                    >
+                      Types
+                    </button>
+                  </li>
+                  <li className='hidden md:block'>
+                    {subtopic.types &&
+                      subtopic.types.map((type) => (
+                        <button 
+                          key={type.id}
+                          className='w-full text-left py-1 px-2 pl-6 rounded text-gray-400 hover:bg-gray-700 text-sm whitespace-nowrap'
+                        >
+                          {type.abbreviation || type.name}
+                        </button>
+                      ))}
+                  </li>
+                  <li>
+                    <button
+                      onClick={() => scrollToSection('diagnosis')}
+                      className={`whitespace-nowrap text-left py-1 px-2 rounded ${
+                        activeSection === 'diagnosis'
+                          ? 'bg-gray-700 text-blue-400'
+                          : 'text-gray-300 hover:bg-gray-700'
+                      }`}
+                    >
+                      Diagnosis
+                    </button>
+                  </li>
+                  <li>
+                    <button
+                      onClick={() => scrollToSection('management')}
+                      className={`whitespace-nowrap text-left py-1 px-2 rounded ${
+                        activeSection === 'management'
+                          ? 'bg-gray-700 text-blue-400'
+                          : 'text-gray-300 hover:bg-gray-700'
+                      }`}
+                    >
+                      Management
+                    </button>
+                  </li>
+                  <li>
+                    <button
+                      onClick={() => scrollToSection('highYield')}
+                      className={`whitespace-nowrap text-left py-1 px-2 rounded ${
+                        activeSection === 'highYield'
+                          ? 'bg-gray-700 text-blue-400'
+                          : 'text-gray-300 hover:bg-gray-700'
+                      }`}
+                    >
+                      High-Yield
+                    </button>
+                  </li>
+                </ul>
+              </nav>
+            </div>
           </div>
-        </div>
+        )}
 
-        {/* Main Content */}
-        <div className='flex-1 overflow-y-auto'>
-          <div className='flex'>
-            {/* Content Area */}
-            <div className='flex-1 p-6'>
+        {/* Main Content Area */}
+        <div className='flex-1 flex flex-col md:flex-row'>
+          {/* Content Area - Hide when in notes-only mode */}
+          {(viewMode === 'both' || viewMode === 'summary') && (
+            <div className={`flex-1 p-4 md:p-6 ${viewMode === 'both' ? 'md:w-2/3' : 'w-full'}`}>
               {/* Introduction Section */}
               <div
                 ref={introductionRef}
-                className='bg-gray-800 p-6 rounded-lg shadow-lg mb-6'
+                className='bg-gray-800 p-4 md:p-6 rounded-lg shadow-lg mb-6 transition-all duration-300'
               >
                 <div
                   className='flex justify-between items-center cursor-pointer'
                   onClick={() => toggleSection('introduction')}
                 >
-                  <h2 className='text-2xl font-bold text-white'>
+                  <h2 className='text-xl md:text-2xl font-bold text-white'>
                     Introduction
                   </h2>
                   <svg
                     xmlns='http://www.w3.org/2000/svg'
-                    className={`h-6 w-6 text-gray-400 transition-transform ${
+                    className={`h-6 w-6 text-gray-400 transition-transform duration-300 ${
                       expandedSections.introduction
                         ? 'transform rotate-180'
                         : ''
@@ -386,7 +640,7 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
                 </div>
 
                 {expandedSections.introduction && (
-                  <div className='mt-4'>
+                  <div className='mt-4 section-content'>
                     <div className='prose prose-invert max-w-none'>
                       {renderContent(subtopic.content)}
                     </div>
@@ -397,18 +651,18 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
               {/* Types Section */}
               <div
                 ref={typesRef}
-                className='bg-gray-800 p-6 rounded-lg shadow-lg mb-6'
+                className='bg-gray-800 p-4 md:p-6 rounded-lg shadow-lg mb-6 transition-all duration-300'
               >
                 <div
                   className='flex justify-between items-center cursor-pointer'
                   onClick={() => toggleSection('types')}
                 >
-                  <h2 className='text-2xl font-bold text-white'>
+                  <h2 className='text-xl md:text-2xl font-bold text-white'>
                     Types of {subtopic.title}
                   </h2>
                   <svg
                     xmlns='http://www.w3.org/2000/svg'
-                    className={`h-6 w-6 text-gray-400 transition-transform ${
+                    className={`h-6 w-6 text-gray-400 transition-transform duration-300 ${
                       expandedSections.types ? 'transform rotate-180' : ''
                     }`}
                     fill='none'
@@ -427,11 +681,11 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
                 {expandedSections.types &&
                   subtopic.types &&
                   subtopic.types.length > 0 && (
-                    <div className='mt-4 space-y-4'>
+                    <div className='mt-4 space-y-4 section-content'>
                       {subtopic.types.map((type) => (
                         <div
                           key={type.id}
-                          className='p-4 bg-gray-700 bg-opacity-50 rounded-lg'
+                          className='p-4 bg-gray-700 bg-opacity-50 rounded-lg hover:bg-opacity-70 transition-all duration-300'
                         >
                           <h3 className='text-lg font-semibold text-blue-300 mb-2'>
                             {type.name}{' '}
@@ -493,18 +747,18 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
               {/* Diagnosis and Management Section */}
               <div
                 ref={diagnosisRef}
-                className='bg-gray-800 p-6 rounded-lg shadow-lg mb-6'
+                className='bg-gray-800 p-4 md:p-6 rounded-lg shadow-lg mb-6 transition-all duration-300'
               >
                 <div
                   className='flex justify-between items-center cursor-pointer'
                   onClick={() => toggleSection('diagnosis')}
                 >
-                  <h2 className='text-2xl font-bold text-white'>
+                  <h2 className='text-xl md:text-2xl font-bold text-white'>
                     Diagnosis and Management
                   </h2>
                   <svg
                     xmlns='http://www.w3.org/2000/svg'
-                    className={`h-6 w-6 text-gray-400 transition-transform ${
+                    className={`h-6 w-6 text-gray-400 transition-transform duration-300 ${
                       expandedSections.diagnosis ? 'transform rotate-180' : ''
                     }`}
                     fill='none'
@@ -521,7 +775,7 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
                 </div>
 
                 {expandedSections.diagnosis && subtopic.management && (
-                  <div className='mt-4'>
+                  <div className='mt-4 section-content'>
                     <p className='text-gray-300 whitespace-pre-wrap'>
                       {subtopic.management}
                     </p>
@@ -532,18 +786,18 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
               {/* High-Yield Points Section */}
               <div
                 ref={highYieldRef}
-                className='bg-gray-800 p-6 rounded-lg shadow-lg'
+                className='bg-gray-800 p-4 md:p-6 rounded-lg shadow-lg transition-all duration-300'
               >
                 <div
                   className='flex justify-between items-center cursor-pointer'
                   onClick={() => toggleSection('highYield')}
                 >
-                  <h2 className='text-2xl font-bold text-white'>
+                  <h2 className='text-xl md:text-2xl font-bold text-white'>
                     High-Yield Points
                   </h2>
                   <svg
                     xmlns='http://www.w3.org/2000/svg'
-                    className={`h-6 w-6 text-gray-400 transition-transform ${
+                    className={`h-6 w-6 text-gray-400 transition-transform duration-300 ${
                       expandedSections.highYield ? 'transform rotate-180' : ''
                     }`}
                     fill='none'
@@ -560,7 +814,7 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
                 </div>
 
                 {expandedSections.highYield && subtopic.highyieldPoints && (
-                  <div className='mt-4'>
+                  <div className='mt-4 section-content'>
                     <pre className='text-gray-300 whitespace-pre-wrap font-sans'>
                       {subtopic.highyieldPoints}
                     </pre>
@@ -568,94 +822,53 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
                 )}
               </div>
             </div>
+          )}
 
-            {/* Notes Column */}
-            <div className='w-80 p-4 border-l border-gray-700'>
-              <div className='sticky top-4'>
+          {/* Notes Column */}
+          {(viewMode === 'both' || viewMode === 'notes') && (
+            <div className={`
+              ${viewMode === 'notes' ? 'w-full' : 'w-full md:w-1/3'} 
+              p-4 
+              ${viewMode === 'both' ? 'md:border-l md:border-gray-700' : ''}
+              bg-gray-800 md:bg-transparent
+            `}>
+              <div className={`${viewMode === 'both' ? 'md:sticky md:top-16' : ''} bg-gray-800 p-4 rounded-lg`}>
                 <div className='flex justify-between items-center mb-4'>
-                  <h2 className='text-xl font-bold'>Notes</h2>
-                  <button className='text-blue-400 hover:text-blue-300'>
+                  <div className="flex items-center">
+                    <h2 className='text-xl font-bold text-white'>Notes</h2>
+                    {/* Save status indicator */}
+                    {renderSaveStatus()}
+                  </div>
+                  <button className='text-blue-400 hover:text-blue-300 transition text-sm'>
                     + Add Page
                   </button>
                 </div>
 
                 <div className='mb-4'>
-                  <button className='bg-indigo-700 text-white px-4 py-1 rounded-md text-sm mb-4'>
-                    Page 1
+                  <button className='bg-indigo-700 text-white px-4 py-1 rounded-md text-sm transition hover:bg-indigo-600'>
+                    {activePage}
                   </button>
                 </div>
 
-                <div className='border border-gray-700 rounded-md'>
-                  <div className='flex items-center p-2 border-b border-gray-700 bg-gray-700'>
-                    <button className='p-1 text-gray-400 hover:text-white'>
-                      <span className='font-bold'>B</span>
-                    </button>
-                    <button className='p-1 text-gray-400 hover:text-white'>
-                      <span className='italic'>I</span>
-                    </button>
-                    <button className='p-1 text-gray-400 hover:text-white'>
-                      <span className='underline'>U</span>
-                    </button>
-                    <button className='p-1 text-gray-400 hover:text-white'>
-                      <span className='line-through'>S</span>
-                    </button>
-                    <button className='p-1 text-gray-400 hover:text-white'>
-                      " "
-                    </button>
-                    <button className='p-1 text-gray-400 hover:text-white'>
-                      {'</>'}
-                    </button>
-                    <button className='p-1 text-gray-400 hover:text-white'>
-                      H₁
-                    </button>
-                    <button className='p-1 text-gray-400 hover:text-white'>
-                      H₂
-                    </button>
-                    <button className='p-1 text-gray-400 hover:text-white'>
-                      ≡
-                    </button>
-                    <button className='p-1 text-gray-400 hover:text-white'>
-                      •
-                    </button>
-                    <button className='p-1 text-gray-400 hover:text-white'>
-                      A
-                    </button>
-                    <button className='p-1 text-gray-400 hover:text-white'>
-                      A
-                    </button>
-                    <button className='p-1 text-gray-400 hover:text-white'>
-                      🔗
-                    </button>
-                  </div>
-
+                <div className='notes-editor-container'>
+                  {/* ReactQuill Editor */}
                   <ReactQuill
-                    theme='snow'
+                    theme="snow"
                     value={notes}
                     onChange={handleNotesChange}
-                    modules={{ toolbar: false }}
-                    className='custom-quill bg-gray-800 text-white rounded-b-md'
-                    style={{ height: '300px', border: 'none' }}
-                    placeholder='Enter your notes here...'
+                    modules={modules}
+                    formats={formats}
+                    className='quill-custom'
+                    style={{ 
+                      borderRadius: '0.5rem',
+                      height: viewMode === 'notes' ? '60vh' : '40vh',
+                    }}
                   />
                 </div>
 
-                <button
-                  onClick={saveNotes}
-                  className='mt-4 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md w-full flex items-center justify-center transition'
-                >
-                  <svg
-                    xmlns='http://www.w3.org/2000/svg'
-                    className='h-5 w-5 mr-2'
-                    viewBox='0 0 20 20'
-                    fill='currentColor'
-                  >
-                    <path d='M7.707 10.293a1 1 0 10-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 11.586V6h5a2 2 0 012 2v7a2 2 0 01-2 2H4a2 2 0 01-2-2V8a2 2 0 012-2h5v5.586l-1.293-1.293zM9 4a1 1 0 012 0v2H9V4z' />
-                  </svg>
-                  Save Notes
-                </button>
               </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
     </div>
