@@ -41,6 +41,7 @@ exports.getTopicContent = async (req, res) => {
         }
       },
       populate: {
+        image: true,
         types: {
           populate: '*'
         },

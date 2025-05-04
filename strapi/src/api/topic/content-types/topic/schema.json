@@ -20,6 +20,14 @@
       "targetField": "title",
       "required": true
     },
+    "image": {
+      "type": "media",
+      "multiple": false,
+      "required": false,
+      "allowedTypes": [
+        "images"
+      ]
+    },
     "introduction": {
       "type": "richtext"
     },

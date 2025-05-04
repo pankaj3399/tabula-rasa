@@ -390,6 +390,7 @@ export interface ApiCardCard extends Struct.CollectionTypeSchema {
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
     explanation: Schema.Attribute.RichText;
+    image: Schema.Attribute.Media<'images' | 'files' | 'videos' | 'audios'>;
     image_or_diagram: Schema.Attribute.Media<'images'>;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<'oneToMany', 'api::card.card'> &
@@ -492,6 +493,7 @@ export interface ApiTopicTopic extends Struct.CollectionTypeSchema {
     diagnosis_overview: Schema.Attribute.RichText;
     diagnostic_tools: Schema.Attribute.Component<'common.text-item', true>;
     highyieldPoints: Schema.Attribute.RichText;
+    image: Schema.Attribute.Media<'images'>;
     introduction: Schema.Attribute.RichText;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<'oneToMany', 'api::topic.topic'> &
