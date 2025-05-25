@@ -12,12 +12,14 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
   const [topic, setTopic] = useState(null);
   const [subtopics, setSubtopics] = useState([]);
   const [activeSubtopic, setActiveSubtopic] = useState(null);
+  const [activeHeading, setActiveHeading] = useState(null);
   const [notes, setNotes] = useState('');
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState('both'); // 'both', 'notes', 'content'
   const [saveStatus, setSaveStatus] = useState('idle');
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [navigationItems, setNavigationItems] = useState([]);
 
   // Multiple pages for notes
   const [pages, setPages] = useState(['Page 1']);
@@ -26,6 +28,7 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
 
   const autoSaveTimerRef = useRef(null);
   const subtopicRefs = useRef({});
+  const headingRefs = useRef({});
   const contentContainerRef = useRef(null);
 
   // Dark mode classes
@@ -68,39 +71,135 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
     'background',
   ];
 
-  // Scroll to subtopic function
-  const scrollToSubtopic = (subtopicId) => {
-    const element = subtopicRefs.current[subtopicId];
-    if (element && contentContainerRef.current) {
-      const container = contentContainerRef.current;
-      const elementTop = element.offsetTop;
-      const containerTop = container.scrollTop;
-      const containerHeight = container.clientHeight;
+  // Extract H2 headings from HTML content
+  const extractHeadings = (htmlContent) => {
+    if (!htmlContent) return [];
 
-      // Calculate the scroll position to center the element
-      const scrollPosition =
-        elementTop - containerHeight / 2 + element.clientHeight / 2;
+    // Create a temporary DOM element to parse HTML
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = htmlContent;
 
-      container.scrollTo({
-        top: Math.max(0, scrollPosition),
-        behavior: 'smooth',
+    const h2Elements = tempDiv.querySelectorAll('h2');
+    return Array.from(h2Elements).map((h2, index) => ({
+      id: `heading-${index}`,
+      text: h2.textContent.trim(),
+      originalText: h2.textContent.trim(),
+    }));
+  };
+
+  // Generate navigation items from subtopics and their H2 headings
+  const generateNavigationItems = (subtopicsData) => {
+    const items = [];
+
+    subtopicsData.forEach((subtopic) => {
+      const subtopicData = subtopic.attributes || subtopic;
+
+      // Add subtopic as main item
+      items.push({
+        id: `subtopic-${subtopic.id}`,
+        text: subtopicData.title,
+        type: 'subtopic',
+        subtopicId: subtopic.id,
+        level: 0,
       });
 
-      setActiveSubtopic(subtopicId);
+      // Extract and add H2 headings as sub-items
+      const headings = extractHeadings(subtopicData.content);
+      headings.forEach((heading, index) => {
+        items.push({
+          id: `subtopic-${subtopic.id}-${heading.id}`,
+          text: heading.text,
+          type: 'heading',
+          subtopicId: subtopic.id,
+          headingIndex: index,
+          level: 1,
+        });
+      });
+    });
+
+    return items;
+  };
+
+  // Scroll to subtopic or heading function
+  const scrollToItem = (item) => {
+    if (item.type === 'subtopic') {
+      const element = subtopicRefs.current[item.subtopicId];
+      if (element && contentContainerRef.current) {
+        const container = contentContainerRef.current;
+        const elementTop = element.offsetTop;
+        const containerHeight = container.clientHeight;
+        const scrollPosition =
+          elementTop - containerHeight / 2 + element.clientHeight / 2;
+
+        container.scrollTo({
+          top: Math.max(0, scrollPosition),
+          behavior: 'smooth',
+        });
+
+        setActiveSubtopic(item.subtopicId);
+        setActiveHeading(null);
+      }
+    } else if (item.type === 'heading') {
+      const headingKey = `subtopic-${item.subtopicId}-heading-${item.headingIndex}`;
+      const element = headingRefs.current[headingKey];
+
+      if (element && contentContainerRef.current) {
+        const container = contentContainerRef.current;
+        const elementTop = element.offsetTop;
+        const containerHeight = container.clientHeight;
+        const scrollPosition =
+          elementTop - containerHeight / 2 + element.clientHeight / 2;
+
+        container.scrollTo({
+          top: Math.max(0, scrollPosition),
+          behavior: 'smooth',
+        });
+
+        setActiveSubtopic(item.subtopicId);
+        setActiveHeading(headingKey);
+      }
     }
+  };
+
+  // Enhanced content rendering with heading IDs
+  const renderContentWithHeadingIds = (content, subtopicId) => {
+    if (!content) return '';
+
+    // Replace H2 tags with ones that have IDs for navigation
+    let processedContent = content;
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = content;
+
+    const h2Elements = tempDiv.querySelectorAll('h2');
+    h2Elements.forEach((h2, index) => {
+      const headingId = `subtopic-${subtopicId}-heading-${index}`;
+      h2.setAttribute('id', headingId);
+      h2.setAttribute('data-heading-key', headingId);
+    });
+
+    return tempDiv.innerHTML;
   };
 
   // Intersection Observer for auto-highlighting active section
   useEffect(() => {
-    if (!contentContainerRef.current || subtopics.length === 0) return;
+    if (!contentContainerRef.current || navigationItems.length === 0) return;
 
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
           if (entry.isIntersecting) {
             const subtopicId = entry.target.getAttribute('data-subtopic-id');
-            if (subtopicId) {
+            const headingKey = entry.target.getAttribute('data-heading-key');
+
+            if (headingKey) {
+              setActiveHeading(headingKey);
               setActiveSubtopic(subtopicId);
+            } else if (subtopicId) {
+              setActiveSubtopic(subtopicId);
+              // Only clear active heading if we're intersecting with a subtopic header
+              if (entry.target.tagName === 'H1') {
+                setActiveHeading(null);
+              }
             }
           }
         });
@@ -117,7 +216,36 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
       if (ref) observer.observe(ref);
     });
 
+    // Observe all heading elements
+    Object.values(headingRefs.current).forEach((ref) => {
+      if (ref) observer.observe(ref);
+    });
+
     return () => observer.disconnect();
+  }, [navigationItems]);
+
+  // Set up heading refs after content is rendered
+  useEffect(() => {
+    if (contentContainerRef.current && subtopics.length > 0) {
+      // Clear existing refs
+      headingRefs.current = {};
+
+      // Set up refs for all H2 elements
+      subtopics.forEach((subtopic) => {
+        const subtopicData = subtopic.attributes || subtopic;
+        const headings = extractHeadings(subtopicData.content);
+
+        headings.forEach((heading, index) => {
+          const headingKey = `subtopic-${subtopic.id}-heading-${index}`;
+          const element = contentContainerRef.current.querySelector(
+            `#subtopic-${subtopic.id}-heading-${index}`
+          );
+          if (element) {
+            headingRefs.current[headingKey] = element;
+          }
+        });
+      });
+    }
   }, [subtopics]);
 
   // Fetch topic and subtopics
@@ -150,6 +278,10 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
 
         console.log('Processed subtopics:', subtopicsData);
         setSubtopics(subtopicsData);
+
+        // Generate navigation items
+        const navItems = generateNavigationItems(subtopicsData);
+        setNavigationItems(navItems);
 
         // Set first subtopic as active
         if (subtopicsData.length > 0) {
@@ -628,25 +760,32 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
                   Table of Contents
                 </h3>
 
-                {subtopics.length === 0 ? (
+                {navigationItems.length === 0 ? (
                   <p
                     className={`text-xs ${
                       darkMode ? 'text-gray-500' : 'text-gray-600'
                     }`}
                   >
-                    No subtopics available
+                    No content available
                   </p>
                 ) : (
                   <nav className='space-y-1'>
-                    {subtopics.map((subtopic) => {
-                      const subtopicData = subtopic.attributes || subtopic;
-                      const isActive = activeSubtopic === subtopic.id;
+                    {navigationItems.map((item) => {
+                      const isActiveSubtopic =
+                        activeSubtopic === item.subtopicId;
+                      const isActiveHeading = activeHeading === item.id;
+                      const isActive =
+                        item.type === 'subtopic'
+                          ? isActiveSubtopic && !activeHeading
+                          : isActiveHeading;
 
                       return (
                         <button
-                          key={subtopic.id}
-                          onClick={() => scrollToSubtopic(subtopic.id)}
+                          key={item.id}
+                          onClick={() => scrollToItem(item)}
                           className={`block w-full text-left p-2 rounded-md transition-all duration-200 ${
+                            item.level === 1 ? 'ml-3 pl-3' : ''
+                          } ${
                             isActive
                               ? `${
                                   darkMode ? 'bg-blue-600' : 'bg-blue-500'
@@ -658,8 +797,15 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
                                 } ${textColor} hover:border-l-3 hover:border-gray-300`
                           }`}
                         >
-                          <span className='text-xs font-medium'>
-                            {subtopicData.title}
+                          <span
+                            className={`${
+                              item.level === 0
+                                ? 'text-xs font-medium'
+                                : 'text-xs font-normal'
+                            }`}
+                          >
+                            {item.level === 1 && '• '}
+                            {item.text}
                           </span>
                         </button>
                       );
@@ -736,7 +882,10 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
                             darkMode ? 'prose-invert' : ''
                           } prose-sm max-w-none ${textColor}`}
                           dangerouslySetInnerHTML={{
-                            __html: subtopicData.content,
+                            __html: renderContentWithHeadingIds(
+                              subtopicData.content,
+                              subtopic.id
+                            ),
                           }}
                         />
                       </section>
@@ -862,8 +1011,8 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
         </div>
       </div>
 
-      {/* Custom CSS for dark mode Quill editor */}
-      <style jsx>{`
+      {/* Custom CSS for dark mode Quill editor and enhanced styling */}
+      <style>{`
         .dark-quill .ql-toolbar {
           border-color: #4b5563;
           background-color: #374151;
@@ -971,6 +1120,36 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
           -webkit-backdrop-filter: blur(8px);
         }
 
+        /* Enhanced H2 styling within content */
+        .prose h2 {
+          position: relative;
+          scroll-margin-top: 80px;
+          padding-top: 1rem;
+          margin-top: 2rem;
+          margin-bottom: 1rem;
+          border-bottom: 1px solid ${darkMode ? '#374151' : '#e5e7eb'};
+          padding-bottom: 0.5rem;
+        }
+
+        .prose h2::before {
+          content: '';
+          position: absolute;
+          left: -1rem;
+          top: 50%;
+          transform: translateY(-50%);
+          width: 4px;
+          height: 1.5rem;
+          background-color: ${darkMode ? '#60a5fa' : '#3b82f6'};
+          border-radius: 2px;
+          opacity: 0;
+          transition: opacity 0.3s ease;
+        }
+
+        .prose h2:target::before,
+        .prose h2.active::before {
+          opacity: 1;
+        }
+
         /* Prose styling adjustments for dark mode */
         .prose-invert h1,
         .prose-invert h2,
@@ -1038,18 +1217,18 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
 
         /* Medical highlight classes */
         .medical-highlight {
-          background-color: ${darkMode
-            ? 'rgba(59, 130, 246, 0.1)'
-            : 'rgba(59, 130, 246, 0.1)'};
+          background-color: ${
+            darkMode ? 'rgba(59, 130, 246, 0.1)' : 'rgba(59, 130, 246, 0.1)'
+          };
           padding: 0.1rem 0.2rem;
           border-radius: 0.2rem;
           border-left: 2px solid #3b82f6;
         }
 
         .medical-warning {
-          background-color: ${darkMode
-            ? 'rgba(239, 68, 68, 0.1)'
-            : 'rgba(239, 68, 68, 0.1)'};
+          background-color: ${
+            darkMode ? 'rgba(239, 68, 68, 0.1)' : 'rgba(239, 68, 68, 0.1)'
+          };
           padding: 0.4rem;
           border-radius: 0.3rem;
           border-left: 3px solid #ef4444;
@@ -1058,9 +1237,9 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
         }
 
         .medical-note {
-          background-color: ${darkMode
-            ? 'rgba(34, 197, 94, 0.1)'
-            : 'rgba(34, 197, 94, 0.1)'};
+          background-color: ${
+            darkMode ? 'rgba(34, 197, 94, 0.1)' : 'rgba(34, 197, 94, 0.1)'
+          };
           padding: 0.4rem;
           border-radius: 0.3rem;
           border-left: 3px solid #22c55e;
@@ -1142,6 +1321,37 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
 
         .animate-pulse {
           animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+
+        /* Navigation hierarchy styling */
+        .nav-subtopic {
+          font-weight: 500;
+          font-size: 0.8rem;
+        }
+
+        .nav-heading {
+          font-weight: 400;
+          font-size: 0.75rem;
+          padding-left: 0.5rem;
+          border-left: 2px solid transparent;
+          margin-left: 0.5rem;
+        }
+
+        .nav-heading.active {
+          border-left-color: ${darkMode ? '#60a5fa' : '#3b82f6'};
+        }
+
+        /* Highlight active headings in content */
+        .prose h2.highlighted {
+          background-color: ${
+            darkMode ? 'rgba(59, 130, 246, 0.05)' : 'rgba(59, 130, 246, 0.05)'
+          };
+          margin-left: -1rem;
+          margin-right: -1rem;
+          padding-left: 1rem;
+          padding-right: 1rem;
+          border-radius: 0.25rem;
+          transition: background-color 0.3s ease;
         }
       `}</style>
     </div>
