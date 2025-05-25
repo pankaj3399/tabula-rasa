@@ -14,7 +14,15 @@ const hasValidOptions = (options) => {
 const HippocampusHustle = ({ darkMode, setDarkMode }) => {
   const { slug } = useParams();
   const { currentUser } = useAuth();
-  const [cards, setCards] = useState([]); // Holds ONLY the due cards for this session
+
+  console.log(
+    '[HippocampusHustle] Component render - slug:',
+    slug,
+    'user:',
+    currentUser?.email
+  );
+
+  const [cards, setCards] = useState([]);
   const [currentCardIndex, setCurrentCardIndex] = useState(0);
   const [showAnswer, setShowAnswer] = useState(false);
   const [error, setError] = useState(null);
@@ -44,13 +52,6 @@ const HippocampusHustle = ({ darkMode, setDarkMode }) => {
 
   useEffect(() => {
     console.log(`[HippocampusHustle] useEffect triggered for slug: ${slug}`);
-
-    if (!currentUser) {
-      console.log('[HippocampusHustle] No current user found.');
-      setError('Please log in to access Hippocampus Hustle.');
-      setLoading(false);
-      return;
-    }
 
     const fetchDueCardsForTopic = async () => {
       setLoading(true);
@@ -116,16 +117,14 @@ const HippocampusHustle = ({ darkMode, setDarkMode }) => {
           console.log(
             `[HippocampusHustle] Received ${sessionCards.length} due/new cards from backend.`
           );
-          // Directly set the state with the cards received
           setCards(sessionCards);
           console.log('[HippocampusHustle] Set cards state with due cards.');
         } else {
           console.warn(
             `[HippocampusHustle] No due or new cards found for topic slug: ${slug}.`
           );
-          // Set error or a specific message state instead of just empty array
           setError('No cards are currently due for review in this topic.');
-          setCards([]); // Ensure cards array is empty
+          setCards([]);
         }
       } catch (error) {
         console.error(
@@ -134,7 +133,7 @@ const HippocampusHustle = ({ darkMode, setDarkMode }) => {
           error
         );
         setError(`Failed to load review session. ${error.message}`);
-        setCards([]); // Ensure cards array is empty on error
+        setCards([]);
       } finally {
         console.log(
           '[HippocampusHustle] Fetch process finished. Setting loading to false.'
@@ -174,8 +173,8 @@ const HippocampusHustle = ({ darkMode, setDarkMode }) => {
         console.log(
           '[HippocampusHustle] SESSION COMPLETE: No more due cards left in this batch.'
         );
-        setError('Review session complete! No more cards are due right now.'); // Use a completion message
-        setCards([]); // Clear cards
+        setError('Review session complete! No more cards are due right now.');
+        setCards([]);
       }
     } catch (error) {
       console.error(
@@ -224,13 +223,12 @@ const HippocampusHustle = ({ darkMode, setDarkMode }) => {
                 viewBox='0 0 24 24'
                 stroke='currentColor'
               >
-                {' '}
                 <path
                   strokeLinecap='round'
                   strokeLinejoin='round'
                   strokeWidth={2}
                   d='M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z'
-                />{' '}
+                />
               </svg>
             )}
             <h2
@@ -282,8 +280,23 @@ const HippocampusHustle = ({ darkMode, setDarkMode }) => {
     );
     return (
       <div className={`min-h-screen ${bgColor} ${textColor}`}>
-        {' '}
-        {/* Internal Error JSX */}{' '}
+        <Header darkMode={darkMode} setDarkMode={setDarkMode} />
+        <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12'>
+          <div
+            className={`${cardBgColor} p-8 rounded-lg text-center shadow-lg`}
+          >
+            <h2 className='text-xl font-bold mb-2 text-red-400'>
+              No Cards Available
+            </h2>
+            <p className={secondaryTextColor}>No cards found to display.</p>
+            <Link
+              to='/knowledge-map'
+              className={`mt-6 inline-block ${primaryButtonBg} text-white px-4 py-2 rounded-md transition`}
+            >
+              Return to Mind Map
+            </Link>
+          </div>
+        </div>
       </div>
     );
   }
@@ -334,22 +347,24 @@ const HippocampusHustle = ({ darkMode, setDarkMode }) => {
                     darkMode ? 'bg-gray-700' : 'bg-gray-200'
                   } rounded-md border-l-4 border-blue-400 italic ${secondaryTextColor} text-sm`}
                 >
-                  {currentCard.scenario}
+                  <div
+                    dangerouslySetInnerHTML={{
+                      __html: currentCard.scenario,
+                    }}
+                  />
                 </div>
               )}
             {/* Question Text */}
             <div className={`${textColor} text-xl leading-relaxed`}>
               {currentCard.question_text ? (
-                // Use a paragraph for semantic structure, but could be a div
-                <p
+                <div
                   dangerouslySetInnerHTML={{
                     __html: currentCard.question_text,
                   }}
                 />
               ) : (
                 <p className='text-red-400 font-semibold'>
-                  {' '}
-                  !! No question text found !!{' '}
+                  !! No question text found !!
                 </p>
               )}
             </div>
@@ -364,13 +379,12 @@ const HippocampusHustle = ({ darkMode, setDarkMode }) => {
               {Object.entries(currentCard.options).map(([key, value]) => (
                 <div
                   key={key}
-                  className={`block p-4 ${optionBg} rounded-lg border ${optionBorder} transition duration-150 ease-in-out cursor-pointer`}
+                  className={`block p-4 ${optionBg} rounded-lg border ${optionBorder} transition duration-150 ease-in-out cursor-pointer hover:shadow-md`}
                   onClick={() => {
                     console.log(`[HippocampusHustle] Option ${key} clicked.`);
                     setShowAnswer(true);
                   }}
                 >
-                  {/* Option Label (A, B, C...) */}
                   <span
                     className={`font-semibold ${
                       darkMode ? 'text-indigo-300' : 'text-indigo-600'
@@ -378,7 +392,6 @@ const HippocampusHustle = ({ darkMode, setDarkMode }) => {
                   >
                     {key.toUpperCase()})
                   </span>
-                  {/* Option Text */}
                   <span className={textColor}>{value}</span>
                 </div>
               ))}
@@ -399,7 +412,6 @@ const HippocampusHustle = ({ darkMode, setDarkMode }) => {
                     Options:
                   </p>
                   {Object.entries(currentCard.options).map(([key, value]) => {
-                    // Determine if this option is the correct one
                     const isCorrect =
                       key.toLowerCase() ===
                       String(currentCard.correct_answer).toLowerCase();
@@ -415,15 +427,14 @@ const HippocampusHustle = ({ darkMode, setDarkMode }) => {
                                 darkMode
                                   ? 'border-green-500'
                                   : 'border-green-400'
-                              }` // Correct answer style
+                              }`
                             : `${
                                 darkMode
                                   ? 'bg-gray-700 border-gray-600'
                                   : 'bg-gray-200 border-gray-300'
-                              } opacity-60 hover:opacity-100` // Incorrect/other options style
+                              } opacity-60 hover:opacity-100`
                         }`}
                       >
-                        {/* Option Label (A, B, C...) */}
                         <span
                           className={`font-semibold mr-3 ${
                             isCorrect
@@ -435,9 +446,8 @@ const HippocampusHustle = ({ darkMode, setDarkMode }) => {
                         >
                           {key.toUpperCase()})
                         </span>
-                        {/* Option Text */}
                         <span
-                          className={`${
+                          className={`flex-1 ${
                             isCorrect
                               ? 'text-white font-bold'
                               : secondaryTextColor
@@ -445,7 +455,6 @@ const HippocampusHustle = ({ darkMode, setDarkMode }) => {
                         >
                           {value}
                         </span>
-                        {/* Checkmark for Correct Answer */}
                         {isCorrect && (
                           <svg
                             xmlns='http://www.w3.org/2000/svg'
@@ -471,7 +480,6 @@ const HippocampusHustle = ({ darkMode, setDarkMode }) => {
                 <strong className='text-green-400'>Correct Answer:</strong>{' '}
                 {currentCard.correct_answer ? (
                   <span className={`${textColor} font-semibold`}>
-                    {/* Display full text if options exist, otherwise just the key */}
                     {optionsAvailable
                       ? `${currentCard.correct_answer?.toUpperCase()} - ${
                           currentCard.options[currentCard.correct_answer] || ''
@@ -480,8 +488,7 @@ const HippocampusHustle = ({ darkMode, setDarkMode }) => {
                   </span>
                 ) : (
                   <span className='text-red-400 font-semibold'>
-                    {' '}
-                    !! No correct_answer property found !!{' '}
+                    !! No correct_answer property found !!
                   </span>
                 )}
               </p>
@@ -498,7 +505,6 @@ const HippocampusHustle = ({ darkMode, setDarkMode }) => {
                   >
                     Explanation:
                   </strong>
-                  {/* Render explanation safely */}
                   <div
                     dangerouslySetInnerHTML={{
                       __html: currentCard.explanation,
@@ -507,8 +513,7 @@ const HippocampusHustle = ({ darkMode, setDarkMode }) => {
                 </div>
               ) : (
                 <p className={`${mutedTextColor} mt-4 text-sm`}>
-                  {' '}
-                  (No explanation provided){' '}
+                  (No explanation provided)
                 </p>
               )}
             </div>
@@ -519,7 +524,7 @@ const HippocampusHustle = ({ darkMode, setDarkMode }) => {
             <div className='text-center mt-8'>
               <button
                 onClick={() => setShowAnswer(true)}
-                className={`${primaryButtonBg} text-white px-6 py-2 rounded-md transition duration-150 ease-in-out shadow-md`}
+                className={`${primaryButtonBg} text-white px-6 py-2 rounded-md transition duration-150 ease-in-out shadow-md hover:shadow-lg`}
               >
                 Show Answer
               </button>
@@ -574,8 +579,8 @@ const HippocampusHustle = ({ darkMode, setDarkMode }) => {
                   <button
                     key={rating.value}
                     onClick={() => handleQualityRating(rating.value)}
-                    className={`flex-grow sm:flex-grow-0 text-white px-3 py-2 sm:px-5 rounded-md text-xs sm:text-sm font-semibold transition duration-150 ease-in-out shadow-md ${rating.color} text-center`}
-                    title={rating.label} // Tooltip for clarity
+                    className={`flex-grow sm:flex-grow-0 text-white px-3 py-2 sm:px-5 rounded-md text-xs sm:text-sm font-semibold transition duration-150 ease-in-out shadow-md hover:shadow-lg ${rating.color} text-center min-w-[60px]`}
+                    title={rating.label}
                   >
                     {rating.value}
                   </button>
@@ -586,11 +591,9 @@ const HippocampusHustle = ({ darkMode, setDarkMode }) => {
               </p>
             </div>
           )}
-        </div>{' '}
-        {/* End Card Container */}
-      </div>{' '}
-      {/* End Max Width Container */}
-    </div> // End Root Div
+        </div>
+      </div>
+    </div>
   );
 };
 
