@@ -5,6 +5,7 @@ const knowledgeMapController = require('../controllers/knowledgeMapController');
 // Route for KnowledgeMap.jsx and SystemView
 router.get('/knowledge-map', knowledgeMapController.getSystems);
 router.get('/topics', knowledgeMapController.getKnowledgeMap);
+router.get('/systems', knowledgeMapController.getSystems); 
 
 // Topic routes
 router.get('/topic-content/:slug', knowledgeMapController.getTopicContent);
