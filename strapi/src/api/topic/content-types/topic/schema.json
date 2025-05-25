@@ -11,37 +11,17 @@
     "draftAndPublish": true
   },
   "attributes": {
-    "title": {
+    "name": {
       "type": "string",
       "required": true
     },
     "slug": {
       "type": "uid",
-      "targetField": "title",
+      "targetField": "name",
       "required": true
     },
-    "introduction": {
-      "type": "richtext"
-    },
-    "types": {
-      "type": "component",
-      "repeatable": true,
-      "component": "topic.disease-type"
-    },
-    "diagnosis_overview": {
-      "type": "richtext"
-    },
-    "diagnostic_tools": {
-      "type": "component",
-      "repeatable": true,
-      "component": "common.text-item"
-    },
-    "management": {
-      "type": "richtext",
-      "required": true
-    },
-    "highyieldPoints": {
-      "type": "richtext"
+    "description": {
+      "type": "text"
     },
     "system": {
       "type": "relation",
@@ -49,16 +29,16 @@
       "target": "api::system.system",
       "inversedBy": "topics"
     },
-    "cards": {
-      "type": "relation",
-      "relation": "oneToMany",
-      "target": "api::card.card",
-      "mappedBy": "topic"
-    },
     "subtopics": {
       "type": "relation",
       "relation": "oneToMany",
       "target": "api::subtopic.subtopic",
+      "mappedBy": "topic"
+    },
+    "cards": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::card.card",
       "mappedBy": "topic"
     }
   }

@@ -6,114 +6,213 @@ import { useAuth } from '../contexts/AuthContext';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
 
-const renderContent = (content, isDarkMode) => {
-  return content.map((block, index) => {
-    if (block.type === 'paragraph') {
-      return (
-        <p key={index}>
-          {block.children.map((child) => child.text).join('')}
-        </p>
-      );
-    }
-    return null;
-  });
-};
-
 const TopicContent = ({ darkMode, setDarkMode }) => {
-  const { id, slug } = useParams();
+  const { slug } = useParams();
   const { currentUser } = useAuth();
-  const [subtopic, setSubtopic] = useState(null);
+  const [topic, setTopic] = useState(null);
+  const [subtopics, setSubtopics] = useState([]);
+  const [activeSubtopic, setActiveSubtopic] = useState(null);
   const [notes, setNotes] = useState('');
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [activeSection, setActiveSection] = useState('introduction');
-  const [expandedSections, setExpandedSections] = useState({
-    introduction: true,
-    types: false,
-    diagnosis: false,
-    highYield: false,
-  });
-  const [viewMode, setViewMode] = useState('both'); // 'both', 'notes', 'summary'
-  const [saveStatus, setSaveStatus] = useState('idle'); // 'idle', 'saving', 'saved', 'error'
+  const [viewMode, setViewMode] = useState('both'); // 'both', 'notes', 'content'
+  const [saveStatus, setSaveStatus] = useState('idle');
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  
+
   // Multiple pages for notes
   const [pages, setPages] = useState(['Page 1']);
   const [activePage, setActivePage] = useState('Page 1');
   const [pageNotes, setPageNotes] = useState({ 'Page 1': '' });
-  
-  // Refs for scrolling to sections
-  const introductionRef = useRef(null);
-  const typesRef = useRef(null);
-  const diagnosisRef = useRef(null);
-  const highYieldRef = useRef(null);
-  const autoSaveTimerRef = useRef(null);
-  const sidebarRef = useRef(null);
 
-  const subtopicId = id || slug;
+  const autoSaveTimerRef = useRef(null);
+  const subtopicRefs = useRef({});
+  const contentContainerRef = useRef(null);
 
   // Dark mode classes
   const bgColor = darkMode ? 'bg-gray-900' : 'bg-gray-100';
   const textColor = darkMode ? 'text-gray-200' : 'text-gray-800';
   const cardBgColor = darkMode ? 'bg-gray-800' : 'bg-white';
-  const cardBorderColor = darkMode ? 'border-gray-700' : 'border-gray-200';
-  const highlightColor = darkMode ? 'text-blue-400' : 'text-blue-600';
-  const mutedTextColor = darkMode ? 'text-gray-400' : 'text-gray-500';
-  const sectionBgColor = darkMode ? 'bg-gray-800' : 'bg-white';
-  const activeSectionBg = darkMode ? 'bg-gray-700' : 'bg-gray-200';
-  const hoverBg = darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-200';
+  const sidebarBgColor = darkMode
+    ? 'bg-gray-800 border-gray-700'
+    : 'bg-gray-100 border-gray-200';
 
-  // Rich text editor modules configuration with added colors
+  // Rich text editor modules configuration
   const modules = {
     toolbar: [
-      [{ 'header': [1, 2, false] }],
+      [{ header: [1, 2, false] }],
       ['bold', 'italic', 'underline', 'strike', 'blockquote'],
-      [{'list': 'ordered'}, {'list': 'bullet'}, {'indent': '-1'}, {'indent': '+1'}],
-      [{ 'color': [] }, { 'background': [] }], // Added color options
+      [
+        { list: 'ordered' },
+        { list: 'bullet' },
+        { indent: '-1' },
+        { indent: '+1' },
+      ],
+      [{ color: [] }, { background: [] }],
       ['link'],
-      ['clean']
+      ['clean'],
     ],
   };
 
-  // Rich text editor formats
   const formats = [
     'header',
-    'bold', 'italic', 'underline', 'strike', 'blockquote',
-    'list', 'bullet', 'indent',
-    'link', 'color', 'background' // Added color formats
+    'bold',
+    'italic',
+    'underline',
+    'strike',
+    'blockquote',
+    'list',
+    'bullet',
+    'indent',
+    'link',
+    'color',
+    'background',
   ];
 
-  // Function to toggle accordion sections
-  const toggleSection = (section) => {
-    setExpandedSections((prev) => ({
-      ...prev,
-      [section]: !prev[section],
-    }));
-  };
+  // Scroll to subtopic function
+  const scrollToSubtopic = (subtopicId) => {
+    const element = subtopicRefs.current[subtopicId];
+    if (element && contentContainerRef.current) {
+      const container = contentContainerRef.current;
+      const elementTop = element.offsetTop;
+      const containerTop = container.scrollTop;
+      const containerHeight = container.clientHeight;
 
-  // Function to scroll to a section and highlight it in the navigation
-  const scrollToSection = (section) => {
-    setActiveSection(section);
+      // Calculate the scroll position to center the element
+      const scrollPosition =
+        elementTop - containerHeight / 2 + element.clientHeight / 2;
 
-    const refs = {
-      introduction: introductionRef,
-      types: typesRef,
-      diagnosis: diagnosisRef,
-      highYield: highYieldRef,
-    };
+      container.scrollTo({
+        top: Math.max(0, scrollPosition),
+        behavior: 'smooth',
+      });
 
-    if (refs[section] && refs[section].current) {
-      refs[section].current.scrollIntoView({ behavior: 'smooth' });
-      setExpandedSections((prev) => ({
-        ...prev,
-        [section]: true, // Expand the section when navigating to it
-      }));
+      setActiveSubtopic(subtopicId);
     }
   };
 
+  // Intersection Observer for auto-highlighting active section
+  useEffect(() => {
+    if (!contentContainerRef.current || subtopics.length === 0) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            const subtopicId = entry.target.getAttribute('data-subtopic-id');
+            if (subtopicId) {
+              setActiveSubtopic(subtopicId);
+            }
+          }
+        });
+      },
+      {
+        root: contentContainerRef.current,
+        rootMargin: '-20% 0px -60% 0px',
+        threshold: 0.1,
+      }
+    );
+
+    // Observe all subtopic elements
+    Object.values(subtopicRefs.current).forEach((ref) => {
+      if (ref) observer.observe(ref);
+    });
+
+    return () => observer.disconnect();
+  }, [subtopics]);
+
+  // Fetch topic and subtopics
+  useEffect(() => {
+    setLoading(true);
+
+    axios
+      .get(`${import.meta.env.VITE_API_URL}/topic-content/${slug}`)
+      .then((response) => {
+        console.log('Topic Response:', response.data);
+
+        if (!response.data.data || response.data.data.length === 0) {
+          throw new Error('Topic not found');
+        }
+
+        const topicData = response.data.data[0];
+        setTopic(topicData);
+
+        // Handle both flattened and nested structures for subtopics
+        let subtopicsData = [];
+        if (topicData.attributes?.subtopics?.data) {
+          subtopicsData = topicData.attributes.subtopics.data;
+        } else if (topicData.subtopics?.data) {
+          subtopicsData = topicData.subtopics.data;
+        } else if (Array.isArray(topicData.subtopics)) {
+          subtopicsData = topicData.subtopics;
+        } else if (Array.isArray(topicData.attributes?.subtopics)) {
+          subtopicsData = topicData.attributes.subtopics;
+        }
+
+        console.log('Processed subtopics:', subtopicsData);
+        setSubtopics(subtopicsData);
+
+        // Set first subtopic as active
+        if (subtopicsData.length > 0) {
+          setActiveSubtopic(subtopicsData[0].id);
+        }
+
+        setError(null);
+      })
+      .catch((error) => {
+        console.error('Error fetching topic:', error);
+        if (error.response?.status === 404) {
+          setError(
+            `Topic "${slug}" not found. Please check the URL or return to the knowledge map.`
+          );
+        } else {
+          setError('Failed to load topic content. Please try again later.');
+        }
+      })
+      .finally(() => setLoading(false));
+
+    // Fetch notes for this topic
+    if (currentUser) {
+      axios
+        .get(`${import.meta.env.VITE_API_URL}/notes`, {
+          params: {
+            userId: currentUser.id,
+            contentId: slug,
+            contentType: 'topic',
+          },
+        })
+        .then((response) => {
+          try {
+            if (response.data.notes) {
+              const parsedNotes = JSON.parse(response.data.notes);
+
+              if (
+                typeof parsedNotes === 'object' &&
+                !Array.isArray(parsedNotes)
+              ) {
+                setPageNotes(parsedNotes);
+                setPages(Object.keys(parsedNotes));
+                setActivePage(Object.keys(parsedNotes)[0]);
+                setNotes(parsedNotes[Object.keys(parsedNotes)[0]] || '');
+                return;
+              }
+            }
+
+            setNotes(response.data.notes || '');
+            setPageNotes({ 'Page 1': response.data.notes || '' });
+          } catch (e) {
+            setNotes(response.data.notes || '');
+            setPageNotes({ 'Page 1': response.data.notes || '' });
+          }
+        })
+        .catch((error) => {
+          console.error('Error fetching notes:', error);
+        });
+    }
+  }, [slug, currentUser]);
+
   // Function to toggle view mode
   const toggleViewMode = () => {
-    const modes = ['both', 'notes', 'summary'];
+    const modes = ['both', 'content', 'notes'];
     const currentIndex = modes.indexOf(viewMode);
     const nextIndex = (currentIndex + 1) % modes.length;
     setViewMode(modes[nextIndex]);
@@ -121,44 +220,41 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
 
   // Get view mode display name
   const getViewModeDisplay = () => {
-    switch(viewMode) {
-      case 'both': return 'Summary & Notes';
-      case 'notes': return 'Notes Only';
-      case 'summary': return 'Summary Only';
-      default: return 'Summary & Notes';
+    switch (viewMode) {
+      case 'both':
+        return 'Content & Notes';
+      case 'content':
+        return 'Content Only';
+      case 'notes':
+        return 'Notes Only';
+      default:
+        return 'Content & Notes';
     }
   };
 
   // Function to add a new page
   const addNewPage = () => {
-    // Save current page notes before adding a new page
     const updatedPageNotes = {
       ...pageNotes,
-      [activePage]: notes
+      [activePage]: notes,
     };
-    
-    // Create a new page name (Page 2, Page 3, etc.)
+
     const newPageNum = pages.length + 1;
     const newPageName = `Page ${newPageNum}`;
-    
-    // Update the pages list and page notes
-    setPages(prev => [...prev, newPageName]);
+
+    setPages((prev) => [...prev, newPageName]);
     setPageNotes(updatedPageNotes);
-    
-    // Switch to the new page (with empty content)
     setActivePage(newPageName);
     setNotes('');
   };
 
   // Function to switch between pages
   const switchPage = (pageName) => {
-    // Save the current page content before switching
-    setPageNotes(prev => ({
+    setPageNotes((prev) => ({
       ...prev,
-      [activePage]: notes
+      [activePage]: notes,
     }));
-    
-    // Switch to the selected page
+
     setActivePage(pageName);
     setNotes(pageNotes[pageName] || '');
   };
@@ -166,18 +262,16 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
   // Auto-save function
   const autoSaveNotes = async () => {
     if (!currentUser || !hasUnsavedChanges) return;
-    
+
     try {
       setSaveStatus('saving');
-      
-      // Update page notes with current content
+
       const updatedPageNotes = {
         ...pageNotes,
-        [activePage]: notes
+        [activePage]: notes,
       };
       setPageNotes(updatedPageNotes);
-      
-      // Check if we're using relative or absolute URL in the API calls
+
       const baseUrl = import.meta.env.VITE_API_URL;
       const notesEndpoint = baseUrl.includes('/api')
         ? '/update-notes'
@@ -187,13 +281,12 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
         userId: currentUser.id,
         contentId: slug,
         contentType: 'topic',
-        notes: JSON.stringify(updatedPageNotes) // Save all pages
+        notes: JSON.stringify(updatedPageNotes),
       });
-      
+
       setSaveStatus('saved');
       setHasUnsavedChanges(false);
-      
-      // Reset status to idle after a few seconds
+
       setTimeout(() => {
         if (setSaveStatus) setSaveStatus('idle');
       }, 3000);
@@ -206,126 +299,21 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
   // Trigger auto-save with debounce
   useEffect(() => {
     if (!currentUser || !hasUnsavedChanges) return;
-    
-    // Clear any existing timer
+
     if (autoSaveTimerRef.current) {
       clearTimeout(autoSaveTimerRef.current);
     }
-    
-    // Set new timer for auto-save (2 seconds after typing stops)
+
     autoSaveTimerRef.current = setTimeout(() => {
       autoSaveNotes();
     }, 2000);
-    
-    // Cleanup function
+
     return () => {
       if (autoSaveTimerRef.current) {
         clearTimeout(autoSaveTimerRef.current);
       }
     };
   }, [notes, hasUnsavedChanges, currentUser]);
-
-  useEffect(() => {
-    console.log(`Fetching topic content for slug: ${slug}`);
-    setLoading(true);
-
-    // Get topic content
-    axios
-      .get(`${import.meta.env.VITE_API_URL}/topic-content/${slug}`)
-      .then((response) => {
-        console.log(
-          'Topic Content Response:',
-          JSON.stringify(response.data, null, 2)
-        );
-
-        if (!response.data.data || response.data.data.length === 0) {
-          throw new Error('Topic not found');
-        }
-
-        const topicData = response.data.data[0]; // Topics return an array
-
-        // Check if data has the expected structure
-        if (!topicData) {
-          throw new Error('Invalid topic data structure');
-        }
-
-        // Update this section to match the actual data structure from the API
-        setSubtopic({
-          id: topicData.id,
-          title: topicData.title,
-          content: [
-            {
-              type: 'paragraph',
-              children: [{ type: 'text', text: topicData.introduction }],
-            },
-          ],
-          management: topicData.management,
-          highyieldPoints: topicData.highyieldPoints,
-          types: topicData.types || [],
-          subtopics: topicData.subtopics || [],
-          isTopic: true, // Add this property to distinguish between topics and subtopics
-        });
-
-        setError(null);
-      })
-      .catch((error) => {
-        console.error('Error fetching topic content:', error);
-        setError(
-          error.response?.status === 404
-            ? 'Topic not found. Please check the slug or ensure it is published.'
-            : 'Failed to load topic content. Please try again later.'
-        );
-      })
-      .finally(() => setLoading(false));
-
-    // Fetch notes for this topic using the updated API
-    if (currentUser) {
-      axios
-        .get(`${import.meta.env.VITE_API_URL}/notes`, {
-          params: {
-            userId: currentUser.id,
-            contentId: slug,
-            contentType: 'topic',
-          },
-        })
-        .then((response) => {
-          // Try to parse notes data as a JSON string of multiple pages
-          try {
-            if (response.data.notes) {
-              const parsedNotes = JSON.parse(response.data.notes);
-              
-              // Check if it's our multi-page format (object with page names as keys)
-              if (typeof parsedNotes === 'object' && !Array.isArray(parsedNotes)) {
-                setPageNotes(parsedNotes);
-                setPages(Object.keys(parsedNotes));
-                setActivePage(Object.keys(parsedNotes)[0]);
-                setNotes(parsedNotes[Object.keys(parsedNotes)[0]] || '');
-                return;
-              }
-            }
-            
-            // If not in our format or no notes, use default single page
-            setNotes(response.data.notes || '');
-            setPageNotes({ 'Page 1': response.data.notes || '' });
-          } catch (e) {
-            // If parsing fails, use as a single page note
-            setNotes(response.data.notes || '');
-            setPageNotes({ 'Page 1': response.data.notes || '' });
-          }
-        })
-        .catch((error) => {
-          console.error('Error fetching notes:', error);
-          // Don't set an error state here to allow the page to load even if notes fail
-        });
-    }
-
-    // Cleanup function to cancel any pending auto-save when unmounting
-    return () => {
-      if (autoSaveTimerRef.current) {
-        clearTimeout(autoSaveTimerRef.current);
-      }
-    };
-  }, [slug, currentUser]);
 
   const saveNotes = async () => {
     if (!currentUser) {
@@ -335,15 +323,13 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
 
     try {
       setSaveStatus('saving');
-      
-      // Update current page in pageNotes
+
       const updatedPageNotes = {
         ...pageNotes,
-        [activePage]: notes
+        [activePage]: notes,
       };
       setPageNotes(updatedPageNotes);
-      
-      // Check if we're using relative or absolute URL in the API calls
+
       const baseUrl = import.meta.env.VITE_API_URL;
       const notesEndpoint = baseUrl.includes('/api')
         ? '/update-notes'
@@ -353,13 +339,12 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
         userId: currentUser.id,
         contentId: slug,
         contentType: 'topic',
-        notes: JSON.stringify(updatedPageNotes) // Save all pages as JSON
+        notes: JSON.stringify(updatedPageNotes),
       });
-      
+
       setSaveStatus('saved');
       setHasUnsavedChanges(false);
-      
-      // Reset status to idle after a few seconds
+
       setTimeout(() => {
         if (setSaveStatus) setSaveStatus('idle');
       }, 3000);
@@ -380,27 +365,18 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
 
   // Function to delete a page
   const deletePage = (pageToDelete) => {
-    // Don't delete if it's the last page
-    if (pages.length <= 1) {
-      return;
-    }
-    
-    // Confirm before deleting
+    if (pages.length <= 1) return;
+
     if (!window.confirm(`Are you sure you want to delete ${pageToDelete}?`)) {
       return;
     }
-    
-    // Create a new pages array without the deleted page
-    const newPages = pages.filter(page => page !== pageToDelete);
-    
-    // Create new pageNotes without the deleted page
+
+    const newPages = pages.filter((page) => page !== pageToDelete);
     const { [pageToDelete]: deletedNotes, ...remainingNotes } = pageNotes;
-    
-    // Update state
+
     setPages(newPages);
     setPageNotes(remainingNotes);
-    
-    // If the active page was deleted, switch to the first available page
+
     if (activePage === pageToDelete) {
       setActivePage(newPages[0]);
       setNotes(remainingNotes[newPages[0]] || '');
@@ -412,36 +388,73 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
     switch (saveStatus) {
       case 'saving':
         return (
-          <div className="flex items-center text-gray-300 text-sm ml-2">
-            <svg className="animate-spin h-4 w-4 mr-1 text-blue-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          <div className='flex items-center text-gray-300 text-xs ml-1'>
+            <svg
+              className='animate-spin h-3 w-3 mr-1 text-blue-400'
+              xmlns='http://www.w3.org/2000/svg'
+              fill='none'
+              viewBox='0 0 24 24'
+            >
+              <circle
+                className='opacity-25'
+                cx='12'
+                cy='12'
+                r='10'
+                stroke='currentColor'
+                strokeWidth='4'
+              ></circle>
+              <path
+                className='opacity-75'
+                fill='currentColor'
+                d='M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z'
+              ></path>
             </svg>
             Saving...
           </div>
         );
       case 'saved':
         return (
-          <div className="flex items-center text-green-400 text-sm ml-2">
-            <svg className="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
+          <div className='flex items-center text-green-400 text-xs ml-1'>
+            <svg
+              className='h-3 w-3 mr-1'
+              fill='none'
+              stroke='currentColor'
+              viewBox='0 0 24 24'
+              xmlns='http://www.w3.org/2000/svg'
+            >
+              <path
+                strokeLinecap='round'
+                strokeLinejoin='round'
+                strokeWidth='2'
+                d='M5 13l4 4L19 7'
+              ></path>
             </svg>
             Saved
           </div>
         );
       case 'error':
         return (
-          <div className="flex items-center text-red-400 text-sm ml-2">
-            <svg className="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          <div className='flex items-center text-red-400 text-xs ml-1'>
+            <svg
+              className='h-3 w-3 mr-1'
+              fill='none'
+              stroke='currentColor'
+              viewBox='0 0 24 24'
+              xmlns='http://www.w3.org/2000/svg'
+            >
+              <path
+                strokeLinecap='round'
+                strokeLinejoin='round'
+                strokeWidth='2'
+                d='M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z'
+              ></path>
             </svg>
             Error saving
           </div>
         );
-      case 'idle':
       default:
         return hasUnsavedChanges ? (
-          <div className="text-blue-400 text-sm ml-2">Unsaved changes</div>
+          <div className='text-blue-400 text-xs ml-1'>Unsaved changes</div>
         ) : null;
     }
   };
@@ -450,11 +463,13 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
     return (
       <div className={`min-h-screen ${bgColor} ${textColor}`}>
         <Header darkMode={darkMode} setDarkMode={setDarkMode} />
-        <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12'>
-          <div className={`${cardBgColor} p-8 rounded-lg text-center shadow-lg`}>
+        <div className='max-w-6xl mx-auto px-3 sm:px-4 lg:px-6 py-8'>
+          <div
+            className={`${cardBgColor} p-6 rounded-lg text-center shadow-lg`}
+          >
             <svg
               xmlns='http://www.w3.org/2000/svg'
-              className='h-16 w-16 text-red-500 mx-auto mb-4'
+              className='h-12 w-12 text-red-500 mx-auto mb-3'
               fill='none'
               viewBox='0 0 24 24'
               stroke='currentColor'
@@ -466,13 +481,13 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
                 d='M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z'
               />
             </svg>
-            <h2 className='text-xl font-bold mb-2'>Error</h2>
-            <p className='text-red-400'>{error}</p>
+            <h2 className='text-lg font-bold mb-2'>Error</h2>
+            <p className='text-red-400 text-sm'>{error}</p>
             <Link
               to='/knowledge-map'
-              className='mt-6 inline-block bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md transition'
+              className='mt-4 inline-block bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-md transition text-sm'
             >
-              Return to Mind Map
+              Return to Knowledge Map
             </Link>
           </div>
         </div>
@@ -480,205 +495,43 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
     );
   }
 
-  if (loading || !subtopic) {
+  if (loading || !topic) {
     return (
       <div className={`min-h-screen ${bgColor} ${textColor}`}>
         <Header darkMode={darkMode} setDarkMode={setDarkMode} />
-        <div className='flex justify-center items-center h-64'>
-          <div className='animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-500'></div>
+        <div className='flex justify-center items-center h-48'>
+          <div className='animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-purple-500'></div>
         </div>
       </div>
     );
   }
 
+  // Helper function to get topic data (handle both nested and flattened)
+  const getTopicData = (topic) => {
+    return topic.attributes || topic;
+  };
+
+  const topicData = getTopicData(topic);
+
   return (
     <div className={`min-h-screen ${bgColor} ${textColor}`}>
-      <style jsx>{`
-        /* Quill editor custom styling */
-        .quill-custom .ql-toolbar {
-          background-color: ${darkMode ? '#374151' : '#f3f4f6'};
-          border-color: ${darkMode ? '#4b5563' : '#e5e7eb'};
-          border-top-left-radius: 0.375rem;
-          border-top-right-radius: 0.375rem;
-        }
-        
-        .quill-custom .ql-container {
-          background-color: ${darkMode ? '#1f2937' : '#ffffff'};
-          border-color: ${darkMode ? '#4b5563' : '#e5e7eb'};
-          border-bottom-left-radius: 0.375rem;
-          border-bottom-right-radius: 0.375rem;
-          font-family: inherit;
-          font-size: 1rem;
-          color: ${darkMode ? '#e5e7eb' : '#374151'};
-        }
-        
-        .quill-custom .ql-editor {
-          color: ${darkMode ? '#e5e7eb' : '#374151'};
-          min-height: 200px;
-        }
-        
-        .quill-custom .ql-stroke {
-          stroke: ${darkMode ? '#9ca3af' : '#6b7280'};
-        }
-        
-        .quill-custom .ql-fill {
-          fill: ${darkMode ? '#9ca3af' : '#6b7280'};
-        }
-        
-        .quill-custom .ql-picker {
-          color: ${darkMode ? '#9ca3af' : '#6b7280'};
-        }
-        
-        .quill-custom .ql-picker-options {
-          background-color: ${darkMode ? '#374151' : '#f9fafb'};
-          border-color: ${darkMode ? '#4b5563' : '#e5e7eb'};
-        }
-        
-        .quill-custom .ql-toolbar button:hover .ql-stroke,
-        .quill-custom .ql-toolbar button.ql-active .ql-stroke {
-          stroke: ${darkMode ? '#60a5fa' : '#2563eb'};
-        }
-        
-        .quill-custom .ql-toolbar button:hover .ql-fill,
-        .quill-custom .ql-toolbar button.ql-active .ql-fill {
-          fill: ${darkMode ? '#60a5fa' : '#2563eb'};
-        }
-        
-        .quill-custom .ql-picker.ql-expanded .ql-picker-label {
-          color: ${darkMode ? '#60a5fa' : '#2563eb'};
-          border-color: ${darkMode ? '#60a5fa' : '#2563eb'};
-        }
-        
-        /* Color picker specific styles */
-        .quill-custom .ql-color .ql-picker-label,
-        .quill-custom .ql-background .ql-picker-label {
-          padding: 0 4px;
-        }
-        
-        .quill-custom .ql-color .ql-picker-options,
-        .quill-custom .ql-background .ql-picker-options {
-          padding: 3px 5px;
-          width: 152px;
-        }
-        
-        .quill-custom .ql-color .ql-picker-item,
-        .quill-custom .ql-background .ql-picker-item {
-          border: 1px solid transparent;
-          float: left;
-          height: 16px;
-          margin: 2px;
-          padding: 0;
-          width: 16px;
-        }
-        
-        /* Page button styles */
-        .page-button {
-          background-color: ${darkMode ? '#4b5563' : '#e5e7eb'};
-          color: ${darkMode ? '#e5e7eb' : '#374151'};
-          padding: 0.25rem 0.75rem;
-          border-radius: 0.375rem;
-          margin-right: 0.5rem;
-          display: inline-flex;
-          align-items: center;
-          transition: all 0.2s;
-        }
-        
-        .page-button.active {
-          background-color: ${darkMode ? '#4f46e5' : '#3b82f6'};
-          color: ${darkMode ? '#ffffff' : '#ffffff'};
-        }
-        
-        .page-button:hover:not(.active) {
-          background-color: ${darkMode ? '#6b7280' : '#d1d5db'};
-        }
-        
-        .page-button .delete-icon {
-          margin-left: 0.5rem;
-          opacity: 0.6;
-          transition: opacity 0.2s;
-        }
-        
-        .page-button:hover .delete-icon {
-          opacity: 1;
-        }
-        
-        /* Content transitions */
-        .section-content {
-          transition: all 0.3s ease;
-        }
-        
-        /* High-yield styling */
-        .high-yield-section {
-          background-color: ${darkMode ? '#1f2a37' : '#f0f4ff'};
-          border-left: 4px solid ${darkMode ? '#6366f1' : '#4f46e5'};
-          border-radius: 15px;
-          color: ${darkMode ? '#e5e7eb' : '#1e293b'};
-          margin-top: 16px;
-          padding: 16px;
-        }
-        
-        .high-yield-header {
-          display: flex;
-          align-items: center;
-          margin-bottom: 16px;
-        }
-        
-        .info-icon {
-          background-color: ${darkMode ? '#374151' : '#e0e7ff'};
-          border-radius: 50%;
-          color: ${darkMode ? '#818cf8' : '#4f46e5'};
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          height: 32px;
-          width: 32px;
-          margin-right: 12px;
-        }
-        
-        .high-yield-title {
-          color: ${darkMode ? '#e5e7eb' : '#1e293b'};
-          font-size: 18px;
-          font-weight: 600;
-        }
-        
-        .high-yield-list {
-          list-style-type: disc;
-          margin-left: 24px;
-          color: ${darkMode ? '#d1d5db' : '#334155'};
-        }
-        
-        .high-yield-list li {
-          margin-bottom: 8px;
-          line-height: 1.5;
-        }
-        
-        /* Responsive adjustments */
-        @media (max-width: 768px) {
-          .quill-custom .ql-editor {
-            max-height: 50vh;
-          }
-        }
-        
-        /* Sticky sidebar */
-        .sticky-sidebar {
-          position: sticky;
-          top: 60px;
-          height: calc(100vh - 60px);
-          overflow-y: auto;
-        }
-      `}</style>
-      
       <Header darkMode={darkMode} setDarkMode={setDarkMode} />
-      
-      {/* Navigation Bar */}
-      <div className={`flex justify-between items-center px-4 py-3 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-gray-100 border-gray-200'} border-b sticky top-0 z-10`}>
+
+      {/* Sticky Navigation Bar */}
+      <div
+        className={`flex justify-between items-center px-3 py-2 ${sidebarBgColor} border-b sticky top-0 z-50 shadow-sm`}
+      >
         <Link
           to='/knowledge-map'
-          className={`${darkMode ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600 hover:text-blue-700'} transition flex items-center`}
+          className={`${
+            darkMode
+              ? 'text-blue-400 hover:text-blue-300'
+              : 'text-blue-600 hover:text-blue-700'
+          } transition flex items-center text-sm`}
         >
           <svg
             xmlns='http://www.w3.org/2000/svg'
-            className='h-5 w-5 mr-1'
+            className='h-4 w-4 mr-1'
             viewBox='0 0 20 20'
             fill='currentColor'
           >
@@ -688,18 +541,21 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
               clipRule='evenodd'
             />
           </svg>
-          Back to Mind Map
+          Back to Knowledge Map
         </Link>
-        
-        <div className='flex items-center space-x-4'>
-          {/* View Toggle Button */}
-          <button 
+
+        <div className='flex items-center space-x-3'>
+          <button
             onClick={toggleViewMode}
-            className={`${darkMode ? 'bg-indigo-700 hover:bg-indigo-600' : 'bg-indigo-600 hover:bg-indigo-500'} text-white px-4 py-2 rounded-md text-sm transition flex items-center`}
+            className={`${
+              darkMode
+                ? 'bg-indigo-700 hover:bg-indigo-600'
+                : 'bg-indigo-600 hover:bg-indigo-500'
+            } text-white px-3 py-1 rounded-md text-xs transition flex items-center`}
           >
             <svg
               xmlns='http://www.w3.org/2000/svg'
-              className='h-4 w-4 mr-2'
+              className='h-3 w-3 mr-1'
               fill='none'
               viewBox='0 0 24 24'
               stroke='currentColor'
@@ -711,16 +567,20 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
                 d='M4 6h16M4 12h16m-7 6h7'
               />
             </svg>
-            Toggle View [{getViewModeDisplay()}]
+            {getViewModeDisplay()}
           </button>
-                    
+
           <Link
-            to={`/study-dashboard/${slug}`}
-            className={`${darkMode ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-indigo-500 hover:bg-indigo-600'} text-white px-4 py-2 rounded-md flex items-center transition`}
+            to={`/hippocampus-hustle/${slug}`}
+            className={`${
+              darkMode
+                ? 'bg-indigo-600 hover:bg-indigo-700'
+                : 'bg-indigo-500 hover:bg-indigo-600'
+            } text-white px-3 py-1 rounded-md flex items-center transition text-xs`}
           >
             <svg
               xmlns='http://www.w3.org/2000/svg'
-              className='h-5 w-5 mr-2'
+              className='h-3 w-3 mr-1'
               fill='none'
               viewBox='0 0 24 24'
               stroke='currentColor'
@@ -732,401 +592,268 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
                 d='M13 10V3L4 14h7v7l9-11h-7z'
               />
             </svg>
-            <span className='hidden sm:inline'>Hippocampus Hustle</span>
-            <span className='sm:hidden'>Study</span>
+            <span className='inline'>Hippocampus Hustle</span>
           </Link>
         </div>
       </div>
 
-      <div className='flex flex-col md:flex-row'>
-        {/* Left Sidebar Navigation - Show only in summary or both modes */}
-        {(viewMode === 'both' || viewMode === 'summary') && (
-          <div 
-            ref={sidebarRef}
-            className={`w-full md:w-40 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-gray-100 border-gray-200'} border-r p-4 sticky-sidebar`}
+      <div className='flex h-[calc(100vh-100px)]'>
+        {/* Sticky Left Sidebar - Table of Contents */}
+        {(viewMode === 'both' || viewMode === 'content') && (
+          <div
+            className={`w-56 ${sidebarBgColor} border-r overflow-y-auto sticky top-0 h-full`}
           >
-            <div className='mb-4'>
-              <h3 className={`text-sm font-semibold ${darkMode ? 'text-gray-400' : 'text-gray-500'} mb-2`}>
-                JUMP TO:
-              </h3>
-              <nav className='flex md:block overflow-x-auto md:overflow-visible pb-2 md:pb-0'>
-                <ul className='flex md:block space-x-2 md:space-x-0 md:space-y-1'>
-                  <li>
-                    <button
-                      onClick={() => scrollToSection('introduction')}
-                      className={`whitespace-nowrap text-left py-1 px-2 rounded ${
-                        activeSection === 'introduction'
-                          ? `${activeSectionBg} ${highlightColor}`
-                          : `${textColor} ${hoverBg}`
-                      }`}
-                    >
-                      Introduction
-                    </button>
-                  </li>
-                  <li>
-                    <button
-                      onClick={() => scrollToSection('types')}
-                      className={`whitespace-nowrap text-left py-1 px-2 rounded ${
-                        activeSection === 'types'
-                          ? `${activeSectionBg} ${highlightColor}`
-                          : `${textColor} ${hoverBg}`
-                      }`}
-                    >
-                      Types
-                    </button>
-                  </li>
-                  <li className='hidden md:block'>
-                    {subtopic.types &&
-                      subtopic.types.map((type) => (
-                        <button 
-                          key={type.id}
-                          className={`w-full text-left py-1 px-2 pl-6 rounded ${darkMode ? 'text-gray-400 hover:bg-gray-700' : 'text-gray-500 hover:bg-gray-200'} text-sm whitespace-nowrap`}
+            <div className='p-3'>
+              <div className='mb-4'>
+                <h2 className={`text-lg font-bold ${textColor} mb-1`}>
+                  {topicData?.name || topicData?.title}
+                </h2>
+                {topicData?.description && (
+                  <p
+                    className={`text-xs ${
+                      darkMode ? 'text-gray-400' : 'text-gray-600'
+                    } mb-3`}
+                  >
+                    {topicData.description}
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <h3
+                  className={`text-xs font-semibold ${
+                    darkMode ? 'text-gray-400' : 'text-gray-500'
+                  } mb-2 uppercase tracking-wide`}
+                >
+                  Table of Contents
+                </h3>
+
+                {subtopics.length === 0 ? (
+                  <p
+                    className={`text-xs ${
+                      darkMode ? 'text-gray-500' : 'text-gray-600'
+                    }`}
+                  >
+                    No subtopics available
+                  </p>
+                ) : (
+                  <nav className='space-y-1'>
+                    {subtopics.map((subtopic) => {
+                      const subtopicData = subtopic.attributes || subtopic;
+                      const isActive = activeSubtopic === subtopic.id;
+
+                      return (
+                        <button
+                          key={subtopic.id}
+                          onClick={() => scrollToSubtopic(subtopic.id)}
+                          className={`block w-full text-left p-2 rounded-md transition-all duration-200 ${
+                            isActive
+                              ? `${
+                                  darkMode ? 'bg-blue-600' : 'bg-blue-500'
+                                } text-white shadow-md border-l-3 border-blue-300`
+                              : `${
+                                  darkMode
+                                    ? 'bg-gray-700 hover:bg-gray-600'
+                                    : 'bg-gray-50 hover:bg-gray-100'
+                                } ${textColor} hover:border-l-3 hover:border-gray-300`
+                          }`}
                         >
-                          {type.abbreviation || type.name}
+                          <span className='text-xs font-medium'>
+                            {subtopicData.title}
+                          </span>
                         </button>
-                      ))}
-                  </li>
-                  <li>
-                    <button
-                      onClick={() => scrollToSection('diagnosis')}
-                      className={`whitespace-nowrap text-left py-1 px-2 rounded ${
-                        activeSection === 'diagnosis'
-                          ? `${activeSectionBg} ${highlightColor}`
-                          : `${textColor} ${hoverBg}`
-                      }`}
-                    >
-                      Diagnosis
-                    </button>
-                  </li>
-                  <li>
-                    <button
-                      onClick={() => scrollToSection('management')}
-                      className={`whitespace-nowrap text-left py-1 px-2 rounded ${
-                        activeSection === 'management'
-                          ? `${activeSectionBg} ${highlightColor}`
-                          : `${textColor} ${hoverBg}`
-                      }`}
-                    >
-                      Management
-                    </button>
-                  </li>
-                  <li>
-                    <button
-                      onClick={() => scrollToSection('highYield')}
-                      className={`whitespace-nowrap text-left py-1 px-2 rounded ${
-                        activeSection === 'highYield'
-                          ? `${activeSectionBg} ${highlightColor}`
-                          : `${textColor} ${hoverBg}`
-                      }`}
-                    >
-                      High-Yield
-                    </button>
-                  </li>
-                </ul>
-              </nav>
+                      );
+                    })}
+                  </nav>
+                )}
+              </div>
             </div>
           </div>
         )}
 
         {/* Main Content Area */}
-        <div className='flex-1 flex flex-col md:flex-row'>
-          {/* Content Area - Hide when in notes-only mode */}
-          {(viewMode === 'both' || viewMode === 'summary') && (
-            <div className={`flex-1 p-4 ${viewMode === 'both' ? 'md:w-2/3' : 'w-full'}`}>
-              {/* Introduction Section */}
-              <div
-                ref={introductionRef}
-                className={`${sectionBgColor} p-4 md:p-6 rounded-lg shadow-lg mb-6 transition-all duration-300`}
-              >
-                <div
-                  className='flex justify-between items-center cursor-pointer'
-                  onClick={() => toggleSection('introduction')}
-                >
-                  <h2 className={`text-xl font-bold ${textColor}`}>
-                    Introduction
-                  </h2>
-                  <svg
-                    xmlns='http://www.w3.org/2000/svg'
-                    className={`h-6 w-6 ${mutedTextColor} transition-transform duration-300 ${
-                      expandedSections.introduction
-                        ? 'transform rotate-180'
-                        : ''
+        <div className='flex-1 flex overflow-hidden'>
+          {/* Scrollable Content Display */}
+          {(viewMode === 'both' || viewMode === 'content') && (
+            <div
+              className={`${
+                viewMode === 'both' ? 'flex-1' : 'w-full'
+              } overflow-y-auto`}
+              ref={contentContainerRef}
+            >
+              <div className='p-4 space-y-8'>
+                {subtopics.length === 0 ? (
+                  <div
+                    className={`text-center mt-16 ${
+                      darkMode ? 'text-gray-400' : 'text-gray-500'
                     }`}
-                    fill='none'
-                    viewBox='0 0 24 24'
-                    stroke='currentColor'
                   >
-                    <path
-                      strokeLinecap='round'
-                      strokeLinejoin='round'
-                      strokeWidth={2}
-                      d='M19 9l-7 7-7-7'
-                    />
-                  </svg>
-                </div>
-
-                {expandedSections.introduction && (
-                  <div className='mt-4 section-content'>
-                    <div className='prose prose-invert max-w-none'>
-                    <div className={darkMode ? 'text-white' : 'text-gray-800'}>
-        {renderContent(subtopic.content)}
-      </div>                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Types Section */}
-              <div
-                ref={typesRef}
-                className={`${sectionBgColor} p-4 md:p-6 rounded-lg shadow-lg mb-6 transition-all duration-300`}
-              >
-                <div
-                  className='flex justify-between items-center cursor-pointer'
-                  onClick={() => toggleSection('types')}
-                >
-                  <h2 className={`text-xl font-bold ${textColor}`}>
-                    Types of {subtopic.title}
-                  </h2>
-                  <svg
-                    xmlns='http://www.w3.org/2000/svg'
-                    className={`h-6 w-6 ${mutedTextColor} transition-transform duration-300 ${
-                      expandedSections.types ? 'transform rotate-180' : ''
-                    }`}
-                    fill='none'
-                    viewBox='0 0 24 24'
-                    stroke='currentColor'
-                  >
-                    <path
-                      strokeLinecap='round'
-                      strokeLinejoin='round'
-                      strokeWidth={2}
-                      d='M19 9l-7 7-7-7'
-                    />
-                  </svg>
-                </div>
-
-                {expandedSections.types &&
-                  subtopic.types &&
-                  subtopic.types.length > 0 && (
-                    <div className='mt-4 space-y-4 section-content'>
-                      {subtopic.types.map((type) => (
-                        <div
-                          key={type.id}
-                          className={`p-4 ${darkMode ? 'bg-gray-700 bg-opacity-50 hover:bg-opacity-70' : 'bg-gray-100 hover:bg-gray-200'} rounded-lg transition-all duration-300`}
-                        >
-                          <h3 className={`text-lg font-semibold ${darkMode ? 'text-blue-300' : 'text-blue-600'} mb-2`}>
-                            {type.name}{' '}
-                            <span className={darkMode ? 'text-gray-400' : 'text-gray-500'}>
-                              ({type.abbreviation})
-                            </span>
-                          </h3>
-                          <p className={`${darkMode ? 'text-gray-300' : 'text-gray-600'} mb-4`}>
-                            {type.description}
-                          </p>
-
-                          {type.symptoms && type.symptoms.length > 0 && (
-                            <div className='mb-3'>
-                              <h4 className={`${darkMode ? 'text-purple-200' : 'text-purple-600'} text-sm font-medium mb-2`}>
-                                Key Symptoms
-                              </h4>
-                              <ul className={`list-disc list-inside ${darkMode ? 'text-gray-300' : 'text-gray-600'} pl-2`}>
-                                {type.symptoms.map((symptom, idx) => (
-                                  <li key={idx}>{symptom.text}</li>
-                                ))}
-                              </ul>
-                            </div>
-                          )}
-
-                          {type.diagnosticFindings &&
-                            type.diagnosticFindings.length > 0 && (
-                              <div className='mb-3'>
-                                <h4 className={`${darkMode ? 'text-purple-200' : 'text-purple-600'} text-sm font-medium mb-2`}>
-                                  Diagnostic Findings
-                                </h4>
-                                <ul className={`list-disc list-inside ${darkMode ? 'text-gray-300' : 'text-gray-600'} pl-2`}>
-                                  {type.diagnosticFindings.map(
-                                    (finding, idx) => (
-                                      <li key={idx}>{finding.text}</li>
-                                    )
-                                  )}
-                                </ul>
-                              </div>
-                            )}
-
-                          {type.causes && type.causes.length > 0 && (
-                            <div>
-                              <h4 className={`${darkMode ? 'text-purple-200' : 'text-purple-600'} text-sm font-medium mb-2`}>
-                                Common Causes
-                              </h4>
-                              <ul className={`list-disc list-inside ${darkMode ? 'text-gray-300' : 'text-gray-600'} pl-2`}>
-                                {type.causes.map((cause, idx) => (
-                                  <li key={idx}>{cause.text}</li>
-                                ))}
-                              </ul>
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-              </div>
-
-              {/* Diagnosis and Management Section */}
-              <div
-                ref={diagnosisRef}
-                className={`${sectionBgColor} p-4 md:p-6 rounded-lg shadow-lg mb-6 transition-all duration-300`}
-              >
-                <div
-                  className='flex justify-between items-center cursor-pointer'
-                  onClick={() => toggleSection('diagnosis')}
-                >
-                  <h2 className={`text-xl font-bold ${textColor}`}>
-                    Diagnosis and Management
-                  </h2>
-                  <svg
-                    xmlns='http://www.w3.org/2000/svg'
-                    className={`h-6 w-6 ${mutedTextColor} transition-transform duration-300 ${
-                      expandedSections.diagnosis ? 'transform rotate-180' : ''
-                    }`}
-                    fill='none'
-                    viewBox='0 0 24 24'
-                    stroke='currentColor'
-                  >
-                    <path
-                      strokeLinecap='round'
-                      strokeLinejoin='round'
-                      strokeWidth={2}
-                      d='M19 9l-7 7-7-7'
-                    />
-                  </svg>
-                </div>
-
-                {expandedSections.diagnosis && subtopic.management && (
-                  <div className='mt-4 section-content'>
-                    <p className={`${darkMode ? 'text-gray-300' : 'text-gray-600'} whitespace-pre-wrap`}>
-                      {subtopic.management}
+                    <svg
+                      xmlns='http://www.w3.org/2000/svg'
+                      className='h-12 w-12 mx-auto mb-3 opacity-50'
+                      fill='none'
+                      viewBox='0 0 24 24'
+                      stroke='currentColor'
+                    >
+                      <path
+                        strokeLinecap='round'
+                        strokeLinejoin='round'
+                        strokeWidth={1.5}
+                        d='M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z'
+                      />
+                    </svg>
+                    <h3 className='text-base font-medium mb-2'>
+                      No subtopics available
+                    </h3>
+                    <p className='text-sm'>
+                      This topic doesn't have any subtopics yet.
                     </p>
                   </div>
-                )}
-              </div>
+                ) : (
+                  subtopics.map((subtopic, index) => {
+                    const subtopicData = subtopic.attributes || subtopic;
 
-              {/* High-Yield Points Section - Updated to match image 2 with dark mode support */}
-              <div
-                ref={highYieldRef}
-                className={`${sectionBgColor} p-4 md:p-6 rounded-lg shadow-lg transition-all duration-300`}
-              >
-                <div
-                  className='flex justify-between items-center cursor-pointer'
-                  onClick={() => toggleSection('highYield')}
-                >
-                  <h2 className={`text-xl font-bold ${textColor}`}>
-                    High-Yield Points
-                  </h2>
-                  <svg
-                    xmlns='http://www.w3.org/2000/svg'
-                    className={`h-6 w-6 ${mutedTextColor} transition-transform duration-300 ${
-                      expandedSections.highYield ? 'transform rotate-180' : ''
-                    }`}
-                    fill='none'
-                    viewBox='0 0 24 24'
-                    stroke='currentColor'
-                  >
-                    <path
-                      strokeLinecap='round'
-                      strokeLinejoin='round'
-                      strokeWidth={2}
-                      d='M19 9l-7 7-7-7'
-                    />
-                  </svg>
-                </div>
-
-                {expandedSections.highYield && subtopic.highyieldPoints && (
-                  <div className='high-yield-section'>
-                    <div className='high-yield-header'>
-                      <div className='info-icon'>
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                          <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                        </svg>
-                      </div>
-                      <h3 className='high-yield-title'>PANCE High-Yield Points</h3>
-                    </div>
-                    <ul className='high-yield-list'>
-                      {subtopic.highyieldPoints.split('\n').filter(point => point.trim()).map((point, index) => (
-                        <li key={index}>{point.trim().replace(/^[•-]\s*/, '')}</li>
-                      ))}
-                    </ul>
-                  </div>
+                    return (
+                      <section
+                        key={subtopic.id}
+                        ref={(el) => (subtopicRefs.current[subtopic.id] = el)}
+                        data-subtopic-id={subtopic.id}
+                        className={`scroll-mt-6 ${
+                          index !== subtopics.length - 1 ? 'border-b pb-8' : ''
+                        } ${darkMode ? 'border-gray-600' : 'border-gray-200'}`}
+                      >
+                        <h1
+                          className={`text-2xl font-bold ${textColor} mb-4 sticky top-0 ${
+                            darkMode ? 'bg-gray-900' : 'bg-gray-100'
+                          } py-3 z-10 border-b ${
+                            darkMode ? 'border-gray-600' : 'border-gray-200'
+                          }`}
+                        >
+                          {subtopicData.title}
+                        </h1>
+                        <div
+                          className={`prose ${
+                            darkMode ? 'prose-invert' : ''
+                          } prose-sm max-w-none ${textColor}`}
+                          dangerouslySetInnerHTML={{
+                            __html: subtopicData.content,
+                          }}
+                        />
+                      </section>
+                    );
+                  })
                 )}
               </div>
             </div>
           )}
 
-          {/* Notes Column - With Multiple Pages Support */}
+          {/* Notes Section */}
           {(viewMode === 'both' || viewMode === 'notes') && (
-            <div className={`
-              ${darkMode ? 'bg-gray-900' : 'bg-gray-50'}
-              ${viewMode === 'notes' ? 'w-full' : 'w-full md:w-1/3'} 
-              p-1
-            `}>
-              <div className="rounded-lg overflow-hidden">
-                <div className='flex justify-between items-center mb-4'>
-                  <h2 className={`text-xl font-bold ${textColor}`}>Notes</h2>
+            <div
+              className={`${
+                viewMode === 'both' ? 'w-80' : 'w-full'
+              } ${cardBgColor} border-l ${
+                darkMode ? 'border-gray-600' : 'border-gray-200'
+              } flex flex-col`}
+            >
+              <div className='p-3 border-b border-gray-600'>
+                <div className='flex justify-between items-center mb-3'>
+                  <h2 className={`text-lg font-bold ${textColor}`}>Notes</h2>
                   <div className='flex items-center'>
                     {renderSaveStatus()}
-                    <button 
+                    <button
                       onClick={saveNotes}
-                      className={`${darkMode ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600 hover:text-blue-700'} transition text-sm flex items-center ml-2`}
+                      className={`${
+                        darkMode
+                          ? 'text-blue-400 hover:text-blue-300'
+                          : 'text-blue-600 hover:text-blue-700'
+                      } transition text-xs flex items-center ml-1`}
                     >
-                      <svg xmlns='http://www.w3.org/2000/svg' className='h-4 w-4 mr-1' viewBox='0 0 20 20' fill='currentColor'>
-                        <path fillRule='evenodd' d='M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM6.293 6.707a1 1 0 010-1.414l3-3a1 1 0 011.414 0l3 3a1 1 0 01-1.414 1.414L11 5.414V13a1 1 0 11-2 0V5.414L7.707 6.707a1 1 0 01-1.414 0z' clipRule='evenodd' />
+                      <svg
+                        xmlns='http://www.w3.org/2000/svg'
+                        className='h-3 w-3 mr-1'
+                        viewBox='0 0 20 20'
+                        fill='currentColor'
+                      >
+                        <path
+                          fillRule='evenodd'
+                          d='M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM6.293 6.707a1 1 0 010-1.414l3-3a1 1 0 011.414 0l3 3a1 1 0 01-1.414 1.414L11 5.414V13a1 1 0 11-2 0V5.414L7.707 6.707a1 1 0 01-1.414 0z'
+                          clipRule='evenodd'
+                        />
                       </svg>
                       Save
                     </button>
-                    <button 
+                    <button
                       onClick={addNewPage}
-                      className={`${darkMode ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600 hover:text-blue-700'} transition text-sm flex items-center ml-4`}
+                      className={`${
+                        darkMode
+                          ? 'text-blue-400 hover:text-blue-300'
+                          : 'text-blue-600 hover:text-blue-700'
+                      } transition text-xs flex items-center ml-3`}
                     >
-                      <span className="text-lg mr-1">+</span> Add Page
+                      <span className='text-sm mr-1'>+</span> Page
                     </button>
                   </div>
                 </div>
-
                 {/* Page tabs */}
-                <div className='mb-4 flex flex-wrap gap-2'>
-                  {pages.map(page => (
-                    <button 
+                <div className='mb-3 flex flex-wrap gap-1'>
+                  {pages.map((page) => (
+                    <button
                       key={page}
                       onClick={() => switchPage(page)}
-                      className={`page-button ${activePage === page ? 'active' : ''}`}
+                      className={`px-2 py-1 rounded text-xs transition flex items-center ${
+                        activePage === page
+                          ? `${
+                              darkMode ? 'bg-blue-600' : 'bg-blue-500'
+                            } text-white`
+                          : `${
+                              darkMode
+                                ? 'bg-gray-600 hover:bg-gray-500'
+                                : 'bg-gray-200 hover:bg-gray-300'
+                            } ${textColor}`
+                      }`}
                     >
                       {page}
-                      {/* Show delete button for all pages except the first one */}
                       {pages.length > 1 && page !== 'Page 1' && (
-                        <span 
-                          className="delete-icon ml-2" 
+                        <span
+                          className='ml-1 opacity-60 hover:opacity-100'
                           onClick={(e) => {
-                            e.stopPropagation(); // Prevent triggering the page switch
+                            e.stopPropagation();
                             deletePage(page);
                           }}
                         >
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                            <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                          <svg
+                            xmlns='http://www.w3.org/2000/svg'
+                            className='h-2 w-2'
+                            viewBox='0 0 20 20'
+                            fill='currentColor'
+                          >
+                            <path
+                              fillRule='evenodd'
+                              d='M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z'
+                              clipRule='evenodd'
+                            />
                           </svg>
                         </span>
                       )}
                     </button>
                   ))}
                 </div>
+              </div>
 
-                <div className='notes-editor-container'>
-                  {/* ReactQuill Editor with Color Options */}
+              {/* Notes Editor Container */}
+              <div className='flex-1 p-3 overflow-hidden'>
+                <div className='h-full'>
                   <ReactQuill
-                    theme="snow"
+                    theme='snow'
                     value={notes}
                     onChange={handleNotesChange}
                     modules={modules}
                     formats={formats}
-                    className='quill-custom'
+                    className={`${
+                      darkMode ? 'dark-quill' : ''
+                    } h-full compact-quill`}
+                    style={{ height: 'calc(100% - 40px)' }}
                   />
                 </div>
               </div>
@@ -1134,6 +861,289 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
           )}
         </div>
       </div>
+
+      {/* Custom CSS for dark mode Quill editor */}
+      <style jsx>{`
+        .dark-quill .ql-toolbar {
+          border-color: #4b5563;
+          background-color: #374151;
+          padding: 6px;
+        }
+
+        .dark-quill .ql-toolbar .ql-stroke {
+          stroke: #d1d5db;
+        }
+
+        .dark-quill .ql-toolbar .ql-fill {
+          fill: #d1d5db;
+        }
+
+        .dark-quill .ql-toolbar .ql-picker-label {
+          color: #d1d5db;
+        }
+
+        .dark-quill .ql-container {
+          border-color: #4b5563;
+          background-color: #1f2937;
+          color: #e5e7eb;
+        }
+
+        .dark-quill .ql-editor {
+          color: #e5e7eb;
+          padding: 8px;
+          font-size: 14px;
+        }
+
+        .dark-quill .ql-editor.ql-blank::before {
+          color: #9ca3af;
+        }
+
+        .dark-quill .ql-tooltip {
+          background-color: #374151;
+          border-color: #4b5563;
+          color: #e5e7eb;
+        }
+
+        .dark-quill .ql-tooltip input {
+          background-color: #1f2937;
+          border-color: #4b5563;
+          color: #e5e7eb;
+        }
+
+        /* Compact quill editor */
+        .compact-quill .ql-toolbar {
+          padding: 4px;
+        }
+
+        .compact-quill .ql-toolbar .ql-formats {
+          margin-right: 8px;
+        }
+
+        .compact-quill .ql-editor {
+          padding: 6px;
+          font-size: 13px;
+          line-height: 1.4;
+        }
+
+        .compact-quill .ql-toolbar button {
+          width: 24px;
+          height: 24px;
+          padding: 2px;
+        }
+
+        .compact-quill .ql-toolbar button svg {
+          width: 12px;
+          height: 12px;
+        }
+
+        /* Smooth scrolling for the content container */
+        .scroll-smooth {
+          scroll-behavior: smooth;
+        }
+
+        /* Custom scrollbar styling */
+        .overflow-y-auto::-webkit-scrollbar {
+          width: 6px;
+        }
+
+        .overflow-y-auto::-webkit-scrollbar-track {
+          background: ${darkMode ? '#1f2937' : '#f1f5f9'};
+        }
+
+        .overflow-y-auto::-webkit-scrollbar-thumb {
+          background: ${darkMode ? '#4b5563' : '#cbd5e1'};
+          border-radius: 3px;
+        }
+
+        .overflow-y-auto::-webkit-scrollbar-thumb:hover {
+          background: ${darkMode ? '#6b7280' : '#94a3b8'};
+        }
+
+        /* Active section highlight animation */
+        .border-l-3 {
+          border-left-width: 3px;
+          transition: border-left-width 0.2s ease-in-out;
+        }
+
+        /* Sticky header backdrop blur effect */
+        .sticky h1 {
+          backdrop-filter: blur(8px);
+          -webkit-backdrop-filter: blur(8px);
+        }
+
+        /* Prose styling adjustments for dark mode */
+        .prose-invert h1,
+        .prose-invert h2,
+        .prose-invert h3,
+        .prose-invert h4,
+        .prose-invert h5,
+        .prose-invert h6 {
+          color: #f9fafb;
+        }
+
+        .prose-invert p,
+        .prose-invert li {
+          color: #e5e7eb;
+        }
+
+        .prose-invert strong {
+          color: #f3f4f6;
+        }
+
+        .prose-invert code {
+          color: #fbbf24;
+          background-color: #374151;
+          padding: 0.1rem 0.2rem;
+          border-radius: 0.2rem;
+          font-size: 0.85em;
+        }
+
+        .prose-invert blockquote {
+          border-left-color: #6b7280;
+          color: #d1d5db;
+        }
+
+        .prose-invert ul > li::marker,
+        .prose-invert ol > li::marker {
+          color: #9ca3af;
+        }
+
+        /* Table styling for medical content */
+        .prose table {
+          border-collapse: collapse;
+          margin: 1rem 0;
+          font-size: 0.9em;
+        }
+
+        .prose th,
+        .prose td {
+          padding: 0.5rem;
+          border: 1px solid ${darkMode ? '#4b5563' : '#d1d5db'};
+        }
+
+        .prose th {
+          background-color: ${darkMode ? '#374151' : '#f8fafc'};
+          font-weight: 600;
+          font-size: 0.85em;
+        }
+
+        .prose-invert th {
+          background-color: #374151;
+          color: #f9fafb;
+        }
+
+        .prose-invert td {
+          border-color: #4b5563;
+        }
+
+        /* Medical highlight classes */
+        .medical-highlight {
+          background-color: ${darkMode
+            ? 'rgba(59, 130, 246, 0.1)'
+            : 'rgba(59, 130, 246, 0.1)'};
+          padding: 0.1rem 0.2rem;
+          border-radius: 0.2rem;
+          border-left: 2px solid #3b82f6;
+        }
+
+        .medical-warning {
+          background-color: ${darkMode
+            ? 'rgba(239, 68, 68, 0.1)'
+            : 'rgba(239, 68, 68, 0.1)'};
+          padding: 0.4rem;
+          border-radius: 0.3rem;
+          border-left: 3px solid #ef4444;
+          margin: 0.8rem 0;
+          font-size: 0.9em;
+        }
+
+        .medical-note {
+          background-color: ${darkMode
+            ? 'rgba(34, 197, 94, 0.1)'
+            : 'rgba(34, 197, 94, 0.1)'};
+          padding: 0.4rem;
+          border-radius: 0.3rem;
+          border-left: 3px solid #22c55e;
+          margin: 0.8rem 0;
+          font-size: 0.9em;
+        }
+
+        /* Improve readability for medical content */
+        .prose {
+          line-height: 1.6;
+        }
+
+        .prose-sm {
+          font-size: 0.875rem;
+          line-height: 1.5;
+        }
+
+        .prose-sm h1 {
+          font-size: 1.5rem;
+          line-height: 1.3;
+        }
+
+        .prose-sm h2 {
+          font-size: 1.25rem;
+          line-height: 1.3;
+          margin-top: 1.5rem;
+          margin-bottom: 0.75rem;
+          padding-bottom: 0.4rem;
+          border-bottom: 1px solid ${darkMode ? '#374151' : '#e5e7eb'};
+        }
+
+        .prose-sm h3 {
+          font-size: 1.1rem;
+          line-height: 1.3;
+          margin-top: 1.2rem;
+          margin-bottom: 0.6rem;
+          color: ${darkMode ? '#60a5fa' : '#2563eb'};
+        }
+
+        .prose-sm p {
+          margin-top: 0.75rem;
+          margin-bottom: 0.75rem;
+        }
+
+        .prose-sm ul,
+        .prose-sm ol {
+          margin-top: 0.75rem;
+          margin-bottom: 0.75rem;
+        }
+
+        .prose-sm li {
+          margin-top: 0.25rem;
+          margin-bottom: 0.25rem;
+        }
+
+        /* Animation for smooth transitions */
+        .transition-all {
+          transition-property: all;
+          transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+          transition-duration: 200ms;
+        }
+
+        /* Focus states for accessibility */
+        button:focus {
+          outline: 2px solid #3b82f6;
+          outline-offset: 1px;
+        }
+
+        /* Loading animation enhancement */
+        @keyframes pulse {
+          0%,
+          100% {
+            opacity: 1;
+          }
+          50% {
+            opacity: 0.5;
+          }
+        }
+
+        .animate-pulse {
+          animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+      `}</style>
     </div>
   );
 };
