@@ -71,20 +71,44 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
     'background',
   ];
 
-  // Extract H2 headings from HTML content
-  const extractHeadings = (htmlContent) => {
-    if (!htmlContent) return [];
+  // Extract H2 headings from content (supports both HTML and markdown)
+  const extractHeadings = (content) => {
+    if (!content) return [];
 
-    // Create a temporary DOM element to parse HTML
-    const tempDiv = document.createElement('div');
-    tempDiv.innerHTML = htmlContent;
+    // Check if content is markdown (contains ## but not HTML tags)
+    const isMarkdown = content.includes('##') && !content.includes('<h2');
+    
+    if (isMarkdown) {
+      // Extract from markdown content
+      const lines = content.split('\n');
+      const headings = [];
+      
+      lines.forEach((line, index) => {
+        // Match lines that start with exactly two # symbols followed by space and text
+        const h2Match = line.match(/^##\s+(.+)$/);
+        if (h2Match) {
+          headings.push({
+            id: `heading-${headings.length}`,
+            text: h2Match[1].trim(),
+            originalText: h2Match[1].trim(),
+            lineNumber: index
+          });
+        }
+      });
 
-    const h2Elements = tempDiv.querySelectorAll('h2');
-    return Array.from(h2Elements).map((h2, index) => ({
-      id: `heading-${index}`,
-      text: h2.textContent.trim(),
-      originalText: h2.textContent.trim(),
-    }));
+      return headings;
+    } else {
+      // Extract from HTML content (existing functionality)
+      const tempDiv = document.createElement('div');
+      tempDiv.innerHTML = content;
+
+      const h2Elements = tempDiv.querySelectorAll('h2');
+      return Array.from(h2Elements).map((h2, index) => ({
+        id: `heading-${index}`,
+        text: h2.textContent.trim(),
+        originalText: h2.textContent.trim(),
+      }));
+    }
   };
 
   // Generate navigation items from subtopics and their H2 headings
@@ -161,20 +185,58 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
     }
   };
 
-  // Enhanced content rendering with heading IDs
+  // Enhanced content rendering with heading IDs (supports both HTML and markdown)
   const renderContentWithHeadingIds = (content, subtopicId) => {
     if (!content) return '';
 
-    // Replace H2 tags with ones that have IDs for navigation
     let processedContent = content;
+    
+    // Check if content is markdown (contains ## but not HTML h2 tags)
+    const isMarkdown = content.includes('##') && !content.includes('<h2');
+    
+    if (isMarkdown) {
+      // Simple markdown to HTML conversion for display
+      processedContent = content
+        // Convert headers (order matters - most specific first)
+        .replace(/^##### (.+)$/gm, '<h5>$1</h5>')
+        .replace(/^#### (.+)$/gm, '<h4>$1</h4>')
+        .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+        .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+        .replace(/^# (.+)$/gm, '<h1>$1</h1>')
+        
+        // Convert bold and italic
+        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*(.+?)\*/g, '<em>$1</em>')
+        
+        // Convert line breaks to paragraphs
+        .split('\n\n')
+        .map(paragraph => {
+          const trimmed = paragraph.trim();
+          if (!trimmed) return '';
+          
+          // Don't wrap if it's already an HTML element
+          if (trimmed.match(/^<(h[1-6]|ul|ol|blockquote|hr|div)/)) {
+            return trimmed;
+          }
+          
+          // Replace single newlines with <br> within paragraphs
+          const withBreaks = trimmed.replace(/\n/g, '<br>');
+          return `<p>${withBreaks}</p>`;
+        })
+        .filter(p => p)
+        .join('\n');
+    }
+
+    // Now add IDs to H2 tags for navigation (works for both converted markdown and existing HTML)
     const tempDiv = document.createElement('div');
-    tempDiv.innerHTML = content;
+    tempDiv.innerHTML = processedContent;
 
     const h2Elements = tempDiv.querySelectorAll('h2');
     h2Elements.forEach((h2, index) => {
       const headingId = `subtopic-${subtopicId}-heading-${index}`;
       h2.setAttribute('id', headingId);
       h2.setAttribute('data-heading-key', headingId);
+      h2.setAttribute('data-subtopic-id', subtopicId);
     });
 
     return tempDiv.innerHTML;
@@ -1180,6 +1242,10 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
         .prose-invert blockquote {
           border-left-color: #6b7280;
           color: #d1d5db;
+          background-color: rgba(75, 85, 99, 0.1);
+          padding: 1rem;
+          margin: 1rem 0;
+          border-radius: 0.375rem;
         }
 
         .prose-invert ul > li::marker,
@@ -1187,17 +1253,39 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
           color: #9ca3af;
         }
 
+        /* Enhanced list styling */
+        .prose ul,
+        .prose ol {
+          margin: 1rem 0;
+          padding-left: 1.5rem;
+        }
+
+        .prose li {
+          margin: 0.25rem 0;
+          line-height: 1.6;
+        }
+
+        .prose ul > li {
+          list-style-type: disc;
+        }
+
+        .prose ol > li {
+          list-style-type: decimal;
+        }
+
         /* Table styling for medical content */
         .prose table {
           border-collapse: collapse;
           margin: 1rem 0;
           font-size: 0.9em;
+          width: 100%;
         }
 
         .prose th,
         .prose td {
           padding: 0.5rem;
           border: 1px solid ${darkMode ? '#4b5563' : '#d1d5db'};
+          text-align: left;
         }
 
         .prose th {
@@ -1215,6 +1303,23 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
           border-color: #4b5563;
         }
 
+        /* Code block styling */
+        .prose pre {
+          background-color: ${darkMode ? '#1f2937' : '#f8fafc'};
+          border: 1px solid ${darkMode ? '#374151' : '#e5e7eb'};
+          border-radius: 0.375rem;
+          padding: 1rem;
+          overflow-x: auto;
+          font-size: 0.875rem;
+          line-height: 1.5;
+          margin: 1rem 0;
+        }
+
+        .prose-invert pre {
+          background-color: #1f2937;
+          border-color: #374151;
+        }
+
         /* Medical highlight classes */
         .medical-highlight {
           background-color: ${
@@ -1229,10 +1334,10 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
           background-color: ${
             darkMode ? 'rgba(239, 68, 68, 0.1)' : 'rgba(239, 68, 68, 0.1)'
           };
-          padding: 0.4rem;
-          border-radius: 0.3rem;
-          border-left: 3px solid #ef4444;
-          margin: 0.8rem 0;
+          padding: 0.75rem;
+          border-radius: 0.375rem;
+          border-left: 4px solid #ef4444;
+          margin: 1rem 0;
           font-size: 0.9em;
         }
 
@@ -1240,16 +1345,17 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
           background-color: ${
             darkMode ? 'rgba(34, 197, 94, 0.1)' : 'rgba(34, 197, 94, 0.1)'
           };
-          padding: 0.4rem;
-          border-radius: 0.3rem;
-          border-left: 3px solid #22c55e;
-          margin: 0.8rem 0;
+          padding: 0.75rem;
+          border-radius: 0.375rem;
+          border-left: 4px solid #22c55e;
+          margin: 1rem 0;
           font-size: 0.9em;
         }
 
         /* Improve readability for medical content */
         .prose {
           line-height: 1.6;
+          max-width: none;
         }
 
         .prose-sm {
@@ -1258,25 +1364,35 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
         }
 
         .prose-sm h1 {
-          font-size: 1.5rem;
+          font-size: 1.75rem;
           line-height: 1.3;
+          margin-bottom: 1rem;
         }
 
         .prose-sm h2 {
-          font-size: 1.25rem;
+          font-size: 1.375rem;
           line-height: 1.3;
-          margin-top: 1.5rem;
-          margin-bottom: 0.75rem;
-          padding-bottom: 0.4rem;
+          margin-top: 2rem;
+          margin-bottom: 1rem;
+          padding-bottom: 0.5rem;
           border-bottom: 1px solid ${darkMode ? '#374151' : '#e5e7eb'};
         }
 
         .prose-sm h3 {
-          font-size: 1.1rem;
+          font-size: 1.125rem;
           line-height: 1.3;
-          margin-top: 1.2rem;
-          margin-bottom: 0.6rem;
+          margin-top: 1.5rem;
+          margin-bottom: 0.75rem;
           color: ${darkMode ? '#60a5fa' : '#2563eb'};
+        }
+
+        .prose-sm h4 {
+          font-size: 1rem;
+          line-height: 1.3;
+          margin-top: 1.25rem;
+          margin-bottom: 0.5rem;
+          font-weight: 600;
+          color: ${darkMode ? '#a78bfa' : '#7c3aed'};
         }
 
         .prose-sm p {
@@ -1352,6 +1468,36 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
           padding-right: 1rem;
           border-radius: 0.25rem;
           transition: background-color 0.3s ease;
+        }
+
+        /* Enhanced content formatting */
+        .prose strong {
+          font-weight: 600;
+          color: ${darkMode ? '#f3f4f6' : '#111827'};
+        }
+
+        .prose em {
+          font-style: italic;
+          color: ${darkMode ? '#d1d5db' : '#374151'};
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+          .prose-sm {
+            font-size: 0.8rem;
+          }
+          
+          .prose-sm h1 {
+            font-size: 1.5rem;
+          }
+          
+          .prose-sm h2 {
+            font-size: 1.25rem;
+          }
+          
+          .prose-sm h3 {
+            font-size: 1.1rem;
+          }
         }
       `}</style>
     </div>
