@@ -71,72 +71,126 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
     'background',
   ];
 
-  // Extract H2 headings from content (supports both HTML and markdown)
+  // Enhanced heading extraction to support H2 and H3 with hierarchy
   const extractHeadings = (content) => {
     if (!content) return [];
 
-    // Check if content is markdown (contains ## but not HTML tags)
     const isMarkdown = content.includes('##') && !content.includes('<h2');
-    
+
     if (isMarkdown) {
-      // Extract from markdown content
       const lines = content.split('\n');
       const headings = [];
-      
+
       lines.forEach((line, index) => {
-        // Match lines that start with exactly two # symbols followed by space and text
+        // Match H2 headings (## text)
         const h2Match = line.match(/^##\s+(.+)$/);
         if (h2Match) {
           headings.push({
-            id: `heading-${headings.length}`,
+            id: `heading-h2-${headings.filter((h) => h.level === 2).length}`,
             text: h2Match[1].trim(),
             originalText: h2Match[1].trim(),
-            lineNumber: index
+            lineNumber: index,
+            level: 2,
+            type: 'h2',
+          });
+        }
+
+        // Match H3 headings (### text)
+        const h3Match = line.match(/^###\s+(.+)$/);
+        if (h3Match) {
+          headings.push({
+            id: `heading-h3-${headings.filter((h) => h.level === 3).length}`,
+            text: h3Match[1].trim(),
+            originalText: h3Match[1].trim(),
+            lineNumber: index,
+            level: 3,
+            type: 'h3',
+            parentH2:
+              headings.filter((h) => h.level === 2).slice(-1)[0]?.id || null,
           });
         }
       });
 
       return headings;
     } else {
-      // Extract from HTML content (existing functionality)
+      // Extract from HTML content
       const tempDiv = document.createElement('div');
       tempDiv.innerHTML = content;
 
+      const headings = [];
+
+      // Extract H2 elements
       const h2Elements = tempDiv.querySelectorAll('h2');
-      return Array.from(h2Elements).map((h2, index) => ({
-        id: `heading-${index}`,
-        text: h2.textContent.trim(),
-        originalText: h2.textContent.trim(),
-      }));
+      Array.from(h2Elements).forEach((h2, index) => {
+        headings.push({
+          id: `heading-h2-${index}`,
+          text: h2.textContent.trim(),
+          originalText: h2.textContent.trim(),
+          level: 2,
+          type: 'h2',
+        });
+      });
+
+      // Extract H3 elements
+      const h3Elements = tempDiv.querySelectorAll('h3');
+      Array.from(h3Elements).forEach((h3, index) => {
+        // Find the parent H2 by checking previous siblings
+        let parentH2 = null;
+        let previousElement = h3.previousElementSibling;
+        while (previousElement) {
+          if (previousElement.tagName === 'H2') {
+            const h2Index = Array.from(tempDiv.querySelectorAll('h2')).indexOf(
+              previousElement
+            );
+            parentH2 = `heading-h2-${h2Index}`;
+            break;
+          }
+          previousElement = previousElement.previousElementSibling;
+        }
+
+        headings.push({
+          id: `heading-h3-${index}`,
+          text: h3.textContent.trim(),
+          originalText: h3.textContent.trim(),
+          level: 3,
+          type: 'h3',
+          parentH2: parentH2,
+        });
+      });
+
+      return headings.sort((a, b) => {
+        // Sort by DOM order
+        const aElement = tempDiv.querySelector(a.type);
+        const bElement = tempDiv.querySelector(b.type);
+        return aElement && bElement
+          ? Array.from(tempDiv.querySelectorAll('h2, h3')).indexOf(aElement) -
+              Array.from(tempDiv.querySelectorAll('h2, h3')).indexOf(bElement)
+          : 0;
+      });
     }
   };
 
-  // Generate navigation items from subtopics and their H2 headings
+  // Enhanced navigation generation with hierarchical structure - REMOVED MAIN HEADINGS
   const generateNavigationItems = (subtopicsData) => {
     const items = [];
 
     subtopicsData.forEach((subtopic) => {
       const subtopicData = subtopic.attributes || subtopic;
 
-      // Add subtopic as main item
-      items.push({
-        id: `subtopic-${subtopic.id}`,
-        text: subtopicData.title,
-        type: 'subtopic',
-        subtopicId: subtopic.id,
-        level: 0,
-      });
-
-      // Extract and add H2 headings as sub-items
+      // Extract and add headings with hierarchy (removed subtopic main item)
       const headings = extractHeadings(subtopicData.content);
-      headings.forEach((heading, index) => {
+
+      headings.forEach((heading) => {
         items.push({
           id: `subtopic-${subtopic.id}-${heading.id}`,
           text: heading.text,
-          type: 'heading',
+          type: heading.type,
           subtopicId: subtopic.id,
-          headingIndex: index,
-          level: 1,
+          headingId: heading.id,
+          level: heading.level === 2 ? 0 : 1, // Adjusted levels since we removed main items
+          parentH2: heading.parentH2
+            ? `subtopic-${subtopic.id}-${heading.parentH2}`
+            : null,
         });
       });
     });
@@ -144,99 +198,131 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
     return items;
   };
 
-  // Scroll to subtopic or heading function
+  // Enhanced scroll function
   const scrollToItem = (item) => {
-    if (item.type === 'subtopic') {
-      const element = subtopicRefs.current[item.subtopicId];
-      if (element && contentContainerRef.current) {
-        const container = contentContainerRef.current;
-        const elementTop = element.offsetTop;
-        const containerHeight = container.clientHeight;
-        const scrollPosition =
-          elementTop - containerHeight / 2 + element.clientHeight / 2;
+    const headingKey = `subtopic-${item.subtopicId}-${item.headingId}`;
+    const element = headingRefs.current[headingKey];
 
-        container.scrollTo({
-          top: Math.max(0, scrollPosition),
-          behavior: 'smooth',
-        });
+    if (element && contentContainerRef.current) {
+      const container = contentContainerRef.current;
+      const elementTop = element.offsetTop;
+      const containerHeight = container.clientHeight;
+      const scrollPosition =
+        elementTop - containerHeight / 2 + element.clientHeight / 2;
 
-        setActiveSubtopic(item.subtopicId);
-        setActiveHeading(null);
-      }
-    } else if (item.type === 'heading') {
-      const headingKey = `subtopic-${item.subtopicId}-heading-${item.headingIndex}`;
-      const element = headingRefs.current[headingKey];
+      container.scrollTo({
+        top: Math.max(0, scrollPosition),
+        behavior: 'smooth',
+      });
 
-      if (element && contentContainerRef.current) {
-        const container = contentContainerRef.current;
-        const elementTop = element.offsetTop;
-        const containerHeight = container.clientHeight;
-        const scrollPosition =
-          elementTop - containerHeight / 2 + element.clientHeight / 2;
-
-        container.scrollTo({
-          top: Math.max(0, scrollPosition),
-          behavior: 'smooth',
-        });
-
-        setActiveSubtopic(item.subtopicId);
-        setActiveHeading(headingKey);
-      }
+      setActiveSubtopic(item.subtopicId);
+      setActiveHeading(headingKey);
     }
   };
 
-  // Enhanced content rendering with heading IDs (supports both HTML and markdown)
+  // Enhanced markdown to HTML conversion with medical formatting
   const renderContentWithHeadingIds = (content, subtopicId) => {
     if (!content) return '';
 
     let processedContent = content;
-    
-    // Check if content is markdown (contains ## but not HTML h2 tags)
+
     const isMarkdown = content.includes('##') && !content.includes('<h2');
-    
+
     if (isMarkdown) {
-      // Simple markdown to HTML conversion for display
+      // Enhanced markdown processing with medical formatting
       processedContent = content
-        // Convert headers (order matters - most specific first)
+        // Process High-Yield Points sections first (before other headers)
+        .replace(
+          /^##\s+(.*High-Yield Points.*)\s*\n((?:(?!^##)[\s\S])*)/gim,
+          (match, title, content) => {
+            const processedPoints = content
+              .split('\n')
+              .filter((line) => line.trim())
+              .map((line) => {
+                if (
+                  line.trim().startsWith('•') ||
+                  line.trim().startsWith('-') ||
+                  line.trim().startsWith('*')
+                ) {
+                  return `<li>${line
+                    .replace(/^[\s]*[•\-*]\s*/, '')
+                    .trim()}</li>`;
+                }
+                return line.trim() ? `<p>${line.trim()}</p>` : '';
+              })
+              .filter((line) => line)
+              .join('\n');
+
+            return `<div class="high-yield-section">
+            <h2>${title}</h2>
+            <div class="high-yield-box">
+              <div class="high-yield-title">PANCE High-Yield Points</div>
+              <ul class="high-yield-list">
+                ${processedPoints}
+              </ul>
+            </div>
+          </div>`;
+          }
+        )
+
+        // Convert other headers (order matters - most specific first)
         .replace(/^##### (.+)$/gm, '<h5>$1</h5>')
         .replace(/^#### (.+)$/gm, '<h4>$1</h4>')
         .replace(/^### (.+)$/gm, '<h3>$1</h3>')
         .replace(/^## (.+)$/gm, '<h2>$1</h2>')
         .replace(/^# (.+)$/gm, '<h1>$1</h1>')
-        
+
         // Convert bold and italic
         .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
         .replace(/\*(.+?)\*/g, '<em>$1</em>')
-        
+
+        // Convert bullet points that aren't already processed
+        .replace(/^[\s]*[•\-*]\s+(.+)$/gm, '<li>$1</li>')
+
+        // Wrap consecutive <li> elements in <ul>
+        .replace(/(<li>.*<\/li>)(\s*<li>.*<\/li>)*/gs, '<ul>$&</ul>')
+
         // Convert line breaks to paragraphs
         .split('\n\n')
-        .map(paragraph => {
+        .map((paragraph) => {
           const trimmed = paragraph.trim();
           if (!trimmed) return '';
-          
-          // Don't wrap if it's already an HTML element
-          if (trimmed.match(/^<(h[1-6]|ul|ol|blockquote|hr|div)/)) {
+
+          // Don't wrap if it's already an HTML element or high-yield section
+          if (trimmed.match(/^<(h[1-6]|ul|ol|blockquote|hr|div|li)/)) {
             return trimmed;
           }
-          
+
           // Replace single newlines with <br> within paragraphs
           const withBreaks = trimmed.replace(/\n/g, '<br>');
           return `<p>${withBreaks}</p>`;
         })
-        .filter(p => p)
+        .filter((p) => p)
         .join('\n');
     }
 
-    // Now add IDs to H2 tags for navigation (works for both converted markdown and existing HTML)
+    // Add IDs to headings for navigation
     const tempDiv = document.createElement('div');
     tempDiv.innerHTML = processedContent;
 
+    // Add IDs to H2 elements
     const h2Elements = tempDiv.querySelectorAll('h2');
     h2Elements.forEach((h2, index) => {
-      const headingId = `subtopic-${subtopicId}-heading-${index}`;
+      const headingId = `subtopic-${subtopicId}-heading-h2-${index}`;
       h2.setAttribute('id', headingId);
       h2.setAttribute('data-heading-key', headingId);
       h2.setAttribute('data-subtopic-id', subtopicId);
+      h2.setAttribute('data-heading-level', '2');
+    });
+
+    // Add IDs to H3 elements
+    const h3Elements = tempDiv.querySelectorAll('h3');
+    h3Elements.forEach((h3, index) => {
+      const headingId = `subtopic-${subtopicId}-heading-h3-${index}`;
+      h3.setAttribute('id', headingId);
+      h3.setAttribute('data-heading-key', headingId);
+      h3.setAttribute('data-subtopic-id', subtopicId);
+      h3.setAttribute('data-heading-level', '3');
     });
 
     return tempDiv.innerHTML;
@@ -258,7 +344,6 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
               setActiveSubtopic(subtopicId);
             } else if (subtopicId) {
               setActiveSubtopic(subtopicId);
-              // Only clear active heading if we're intersecting with a subtopic header
               if (entry.target.tagName === 'H1') {
                 setActiveHeading(null);
               }
@@ -289,18 +374,16 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
   // Set up heading refs after content is rendered
   useEffect(() => {
     if (contentContainerRef.current && subtopics.length > 0) {
-      // Clear existing refs
       headingRefs.current = {};
 
-      // Set up refs for all H2 elements
       subtopics.forEach((subtopic) => {
         const subtopicData = subtopic.attributes || subtopic;
         const headings = extractHeadings(subtopicData.content);
 
-        headings.forEach((heading, index) => {
-          const headingKey = `subtopic-${subtopic.id}-heading-${index}`;
+        headings.forEach((heading) => {
+          const headingKey = `subtopic-${subtopic.id}-${heading.id}`;
           const element = contentContainerRef.current.querySelector(
-            `#subtopic-${subtopic.id}-heading-${index}`
+            `#${headingKey}`
           );
           if (element) {
             headingRefs.current[headingKey] = element;
@@ -584,7 +667,7 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
         return (
           <div className='flex items-center text-gray-300 text-xs ml-1'>
             <svg
-              className='animate-spin h-3 w-3 mr-1 text-blue-400'
+              className='animate-spin h-3 w-3 mr-1 text-blue-500'
               xmlns='http://www.w3.org/2000/svg'
               fill='none'
               viewBox='0 0 24 24'
@@ -648,7 +731,7 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
         );
       default:
         return hasUnsavedChanges ? (
-          <div className='text-blue-400 text-xs ml-1'>Unsaved changes</div>
+          <div className='text-blue-500 text-xs ml-1'>Unsaved changes</div>
         ) : null;
     }
   };
@@ -720,7 +803,7 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
           className={`${
             darkMode
               ? 'text-blue-400 hover:text-blue-300'
-              : 'text-blue-600 hover:text-blue-700'
+              : 'text-blue-500 hover:text-blue-600'
           } transition flex items-center text-sm`}
         >
           <svg
@@ -744,7 +827,7 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
             className={`${
               darkMode
                 ? 'bg-indigo-700 hover:bg-indigo-600'
-                : 'bg-indigo-600 hover:bg-indigo-500'
+                : 'bg-blue-500 hover:bg-blue-600'
             } text-white px-3 py-1 rounded-md text-xs transition flex items-center`}
           >
             <svg
@@ -768,8 +851,8 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
             to={`/hippocampus-hustle/${slug}`}
             className={`${
               darkMode
-                ? 'bg-indigo-600 hover:bg-indigo-700'
-                : 'bg-indigo-500 hover:bg-indigo-600'
+                ? 'bg-blue-600 hover:bg-blue-700'
+                : 'bg-blue-500 hover:bg-blue-600'
             } text-white px-3 py-1 rounded-md flex items-center transition text-xs`}
           >
             <svg
@@ -792,14 +875,14 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
       </div>
 
       <div className='flex h-[calc(100vh-100px)]'>
-        {/* Sticky Left Sidebar - Table of Contents */}
+        {/* Enhanced Sticky Left Sidebar - Table of Contents */}
         {(viewMode === 'both' || viewMode === 'content') && (
           <div
             className={`w-56 ${sidebarBgColor} border-r overflow-y-auto sticky top-0 h-full`}
           >
             <div className='p-3'>
               <div className='mb-4'>
-                <h2 className={`text-lg font-bold ${textColor} mb-1`}>
+                <h2 className={`text-base font-bold ${textColor} mb-1`}>
                   {topicData?.name || topicData?.title}
                 </h2>
                 {topicData?.description && (
@@ -833,42 +916,27 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
                 ) : (
                   <nav className='space-y-1'>
                     {navigationItems.map((item) => {
-                      const isActiveSubtopic =
-                        activeSubtopic === item.subtopicId;
                       const isActiveHeading = activeHeading === item.id;
-                      const isActive =
-                        item.type === 'subtopic'
-                          ? isActiveSubtopic && !activeHeading
-                          : isActiveHeading;
 
                       return (
                         <button
                           key={item.id}
                           onClick={() => scrollToItem(item)}
-                          className={`block w-full text-left p-2 rounded-md transition-all duration-200 ${
-                            item.level === 1 ? 'ml-3 pl-3' : ''
+                          className={`block w-full text-left p-2 transition-all duration-200 ${
+                            item.level === 1 ? 'ml-4' : ''
                           } ${
-                            isActive
+                            isActiveHeading
                               ? `${
-                                  darkMode ? 'bg-blue-600' : 'bg-blue-500'
-                                } text-white shadow-md border-l-3 border-blue-300`
+                                  darkMode ? 'text-blue-600' : 'text-blue-500'
+                                } font-semibold border-l-3 border-blue-500`
                               : `${
-                                  darkMode
-                                    ? 'bg-gray-700 hover:bg-gray-600'
-                                    : 'bg-gray-50 hover:bg-gray-100'
-                                } ${textColor} hover:border-l-3 hover:border-gray-300`
+                                  darkMode ? 'text-gray-300' : 'text-gray-700'
+                                } hover:${
+                                  darkMode ? 'text-blue-600' : 'text-blue-500'
+                                }`
                           }`}
                         >
-                          <span
-                            className={`${
-                              item.level === 0
-                                ? 'text-xs font-medium'
-                                : 'text-xs font-normal'
-                            }`}
-                          >
-                            {item.level === 1 && '• '}
-                            {item.text}
-                          </span>
+                          <span className='text-xs'>{item.text}</span>
                         </button>
                       );
                     })}
@@ -931,9 +999,9 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
                         } ${darkMode ? 'border-gray-600' : 'border-gray-200'}`}
                       >
                         <h1
-                          className={`text-2xl font-bold ${textColor} mb-4 sticky top-0 ${
+                          className={`text-xl font-bold ${textColor} mb-3 sticky top-0 ${
                             darkMode ? 'bg-gray-900' : 'bg-gray-100'
-                          } py-3 z-10 border-b ${
+                          } py-2 z-10 border-b ${
                             darkMode ? 'border-gray-600' : 'border-gray-200'
                           }`}
                         >
@@ -942,7 +1010,7 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
                         <div
                           className={`prose ${
                             darkMode ? 'prose-invert' : ''
-                          } prose-sm max-w-none ${textColor}`}
+                          } prose-xs max-w-none ${textColor} medical-content`}
                           dangerouslySetInnerHTML={{
                             __html: renderContentWithHeadingIds(
                               subtopicData.content,
@@ -976,8 +1044,8 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
                       onClick={saveNotes}
                       className={`${
                         darkMode
-                          ? 'text-blue-400 hover:text-blue-300'
-                          : 'text-blue-600 hover:text-blue-700'
+                          ? 'text-blue-600 hover:text-blue-500'
+                          : 'text-blue-500 hover:text-blue-600'
                       } transition text-xs flex items-center ml-1`}
                     >
                       <svg
@@ -998,8 +1066,8 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
                       onClick={addNewPage}
                       className={`${
                         darkMode
-                          ? 'text-blue-400 hover:text-blue-300'
-                          : 'text-blue-600 hover:text-blue-700'
+                          ? 'text-blue-600 hover:text-blue-500'
+                          : 'text-blue-500 hover:text-blue-600'
                       } transition text-xs flex items-center ml-3`}
                     >
                       <span className='text-sm mr-1'>+</span> Page
@@ -1073,8 +1141,115 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
         </div>
       </div>
 
-      {/* Custom CSS for dark mode Quill editor and enhanced styling */}
+      {/* Enhanced Custom CSS for Medical Content and High-Yield Points */}
       <style>{`
+        /* High-Yield Points Special Styling - UPDATED WITH EXACT COLORS */
+        .high-yield-section {
+          margin: 2rem 0;
+        }
+
+        .high-yield-box {
+          background: ${
+            darkMode
+              ? '#20193A'
+              : 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 50%, #e2e8f0 100%)'
+          };
+          border-radius: 12px;
+          padding: 1.5rem;
+          margin: 1rem 0;
+          box-shadow: 0 8px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+          border: ${
+            darkMode ? '1px solid rgba(93, 92, 222, 0.3)' : '2px solid #7c3aed'
+          };
+          position: relative;
+          overflow: hidden;
+        }
+
+        .high-yield-box::before {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: ${
+            darkMode
+              ? 'rgba(93, 92, 222, 0.1)'
+              : 'linear-gradient(45deg, rgba(124, 58, 237, 0.05) 0%, rgba(167, 139, 250, 0.03) 100%)'
+          };
+          pointer-events: none;
+        }
+
+        .high-yield-icon {
+          font-size: 1.5rem;
+          margin-bottom: 0.5rem;
+          display: block;
+          filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+        }
+
+        .high-yield-title {
+          color: ${darkMode ? '#fbbf24' : '#7c3aed'};
+          font-weight: 700;
+          font-size: 0.75rem;
+          margin-bottom: 1rem;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+          text-shadow: ${
+            darkMode
+              ? '0 1px 2px rgba(0, 0, 0, 0.5)'
+              : '0 1px 2px rgba(124, 58, 237, 0.3)'
+          };
+          position: relative;
+          z-index: 1;
+        }
+
+        .high-yield-list {
+          list-style: none;
+          padding: 0;
+          margin: 0;
+          position: relative;
+          z-index: 1;
+        }
+
+        .high-yield-list li {
+          color: ${darkMode ? '#ffffff' : '#5b21b6'} !important;
+          font-size: 0.75rem;
+          line-height: 1.6;
+          margin-bottom: 0.75rem;
+          padding-left: 1.5rem;
+          position: relative;
+          font-weight: 400;
+          text-shadow: ${darkMode ? '0 1px 2px rgba(0, 0, 0, 0.2)' : 'none'};
+        }
+
+        .high-yield-list li::before {
+          content: '•';
+          position: absolute;
+          left: 0;
+          color: ${darkMode ? '#ffffff' : '#7c3aed'};
+          font-weight: bold;
+          font-size: 1.2rem;
+          top: 0;
+        }
+
+        .high-yield-list li:last-child {
+          margin-bottom: 0;
+        }
+
+        /* Override any conflicting styles for high-yield content */
+        .high-yield-box .high-yield-list li {
+          color: ${darkMode ? '#ffffff' : '#5b21b6'} !important;
+        }
+
+        .high-yield-box * {
+          color: ${darkMode ? '#ffffff' : 'inherit'} !important;
+        }
+
+        .high-yield-section h2 {
+          display: none; /* Hide the duplicate heading */
+        } 
+
+        /* Enhanced dark mode styling */
         .dark-quill .ql-toolbar {
           border-color: #4b5563;
           background-color: #374151;
@@ -1147,12 +1322,146 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
           height: 12px;
         }
 
-        /* Smooth scrolling for the content container */
+        /* Medical content specific styling */
+        .medical-content h2 {
+          position: relative;
+          scroll-margin-top: 80px;
+          padding-top: 0.75rem;
+          margin-top: 1.5rem;
+          margin-bottom: 0.75rem;
+          border-bottom: 2px solid ${darkMode ? '#374151' : '#e5e7eb'};
+          padding-bottom: 0.5rem;
+          color: ${darkMode ? '#2563eb' : '#3b82f6'};
+          font-weight: 700;
+          font-size: 1.25rem;
+        }
+
+        .medical-content h3 {
+          position: relative;
+          scroll-margin-top: 80px;
+          padding-top: 0.5rem;
+          margin-top: 1rem;
+          margin-bottom: 0.5rem;
+          color: ${darkMode ? '#a78bfa' : '#7c3aed'};
+          font-weight: 600;
+          border-left: 3px solid ${darkMode ? '#a78bfa' : '#7c3aed'};
+          padding-left: 0.5rem;
+          font-size: 1.1rem;
+        }
+
+        .medical-content h4 {
+          color: ${darkMode ? '#2563eb' : '#3b82f6'};
+          font-weight: 600;
+          margin-top: 1rem;
+          margin-bottom: 0.4rem;
+          font-size: 1rem;
+        }
+
+        /* Enhanced list styling for medical content */
+        .medical-content ul {
+          margin: 0.75rem 0;
+          padding-left: 1.25rem;
+        }
+
+        .medical-content li {
+          margin: 0.4rem 0;
+          line-height: 1.5;
+          color: ${darkMode ? '#e5e7eb' : '#374151'};
+          font-size: 0.875rem;
+        }
+
+        .medical-content ul > li {
+          list-style-type: none;
+          position: relative;
+        }
+
+        .medical-content ul > li::before {
+          content: '•';
+          color: ${darkMode ? '#2563eb' : '#3b82f6'};
+          font-weight: bold;
+          position: absolute;
+          left: -1rem;
+          font-size: 1em;
+        }
+
+        /* Strong text styling - PURPLE FOR EMPHASIS */
+        .medical-content strong {
+          font-weight: 600;
+          color: ${darkMode ? '#a78bfa' : '#7c3aed'};
+          background: ${
+            darkMode ? 'rgba(167, 139, 250, 0.1)' : 'rgba(124, 58, 237, 0.1)'
+          };
+          padding: 0.05rem 0.15rem;
+          border-radius: 0.15rem;
+          font-size: 0.875rem;
+        }
+
+        /* Code styling */
+        .medical-content code {
+          background-color: ${darkMode ? '#374151' : '#f3f4f6'};
+          color: ${darkMode ? '#2563eb' : '#3b82f6'};
+          padding: 0.15rem 0.3rem;
+          border-radius: 0.2rem;
+          font-size: 0.8rem;
+          font-weight: 500;
+          border: 1px solid ${darkMode ? '#4b5563' : '#e5e7eb'};
+        }
+
+        .medical-content p {
+          font-size: 0.875rem;
+          line-height: 1.6;
+          margin: 0.75rem 0;
+        }
+
+        /* Table styling */
+        .medical-content table {
+          border-collapse: collapse;
+          margin: 1.5rem 0;
+          font-size: 0.875rem;
+          width: 100%;
+          box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+          border-radius: 0.5rem;
+          overflow: hidden;
+        }
+
+        .medical-content th,
+        .medical-content td {
+          padding: 0.75rem;
+          border: 1px solid ${darkMode ? '#4b5563' : '#d1d5db'};
+          text-align: left;
+        }
+
+        .medical-content th {
+          background-color: ${darkMode ? '#374151' : '#f8fafc'};
+          font-weight: 600;
+          font-size: 0.875em;
+          color: ${darkMode ? '#f9fafb' : '#111827'};
+        }
+
+        /* Blockquote styling */
+        .medical-content blockquote {
+          border-left: 4px solid ${darkMode ? '#2563eb' : '#3b82f6'};
+          background-color: ${
+            darkMode ? 'rgba(37, 99, 235, 0.1)' : 'rgba(59, 130, 246, 0.05)'
+          };
+          padding: 1rem 1.5rem;
+          margin: 1.5rem 0;
+          border-radius: 0 0.5rem 0.5rem 0;
+          font-style: italic;
+        }
+
+        /* Navigation hierarchy improvements */
+        .border-l-3 {
+          border-left-width: 3px;
+          transition: all 0.2s ease-in-out;
+        }
+
+        /* Smooth scrolling */
         .scroll-smooth {
           scroll-behavior: smooth;
         }
 
-        /* Custom scrollbar styling */
+        /* Custom scrollbar */
         .overflow-y-auto::-webkit-scrollbar {
           width: 6px;
         }
@@ -1170,248 +1479,65 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
           background: ${darkMode ? '#6b7280' : '#94a3b8'};
         }
 
-        /* Active section highlight animation */
-        .border-l-3 {
-          border-left-width: 3px;
-          transition: border-left-width 0.2s ease-in-out;
-        }
-
-        /* Sticky header backdrop blur effect */
-        .sticky h1 {
-          backdrop-filter: blur(8px);
-          -webkit-backdrop-filter: blur(8px);
-        }
-
-        /* Enhanced H2 styling within content */
-        .prose h2 {
-          position: relative;
-          scroll-margin-top: 80px;
-          padding-top: 1rem;
-          margin-top: 2rem;
-          margin-bottom: 1rem;
-          border-bottom: 1px solid ${darkMode ? '#374151' : '#e5e7eb'};
-          padding-bottom: 0.5rem;
-        }
-
-        .prose h2::before {
-          content: '';
-          position: absolute;
-          left: -1rem;
-          top: 50%;
-          transform: translateY(-50%);
-          width: 4px;
-          height: 1.5rem;
-          background-color: ${darkMode ? '#60a5fa' : '#3b82f6'};
-          border-radius: 2px;
-          opacity: 0;
-          transition: opacity 0.3s ease;
-        }
-
-        .prose h2:target::before,
-        .prose h2.active::before {
-          opacity: 1;
-        }
-
-        /* Prose styling adjustments for dark mode */
-        .prose-invert h1,
-        .prose-invert h2,
-        .prose-invert h3,
-        .prose-invert h4,
-        .prose-invert h5,
-        .prose-invert h6 {
-          color: #f9fafb;
-        }
-
-        .prose-invert p,
-        .prose-invert li {
-          color: #e5e7eb;
-        }
-
-        .prose-invert strong {
-          color: #f3f4f6;
-        }
-
-        .prose-invert code {
-          color: #fbbf24;
-          background-color: #374151;
-          padding: 0.1rem 0.2rem;
-          border-radius: 0.2rem;
-          font-size: 0.85em;
-        }
-
-        .prose-invert blockquote {
-          border-left-color: #6b7280;
-          color: #d1d5db;
-          background-color: rgba(75, 85, 99, 0.1);
-          padding: 1rem;
-          margin: 1rem 0;
-          border-radius: 0.375rem;
-        }
-
-        .prose-invert ul > li::marker,
-        .prose-invert ol > li::marker {
-          color: #9ca3af;
-        }
-
-        /* Enhanced list styling */
-        .prose ul,
-        .prose ol {
-          margin: 1rem 0;
-          padding-left: 1.5rem;
-        }
-
-        .prose li {
-          margin: 0.25rem 0;
-          line-height: 1.6;
-        }
-
-        .prose ul > li {
-          list-style-type: disc;
-        }
-
-        .prose ol > li {
-          list-style-type: decimal;
-        }
-
-        /* Table styling for medical content */
-        .prose table {
-          border-collapse: collapse;
-          margin: 1rem 0;
-          font-size: 0.9em;
-          width: 100%;
-        }
-
-        .prose th,
-        .prose td {
-          padding: 0.5rem;
-          border: 1px solid ${darkMode ? '#4b5563' : '#d1d5db'};
-          text-align: left;
-        }
-
-        .prose th {
-          background-color: ${darkMode ? '#374151' : '#f8fafc'};
-          font-weight: 600;
-          font-size: 0.85em;
-        }
-
-        .prose-invert th {
-          background-color: #374151;
-          color: #f9fafb;
-        }
-
-        .prose-invert td {
-          border-color: #4b5563;
-        }
-
-        /* Code block styling */
-        .prose pre {
-          background-color: ${darkMode ? '#1f2937' : '#f8fafc'};
-          border: 1px solid ${darkMode ? '#374151' : '#e5e7eb'};
-          border-radius: 0.375rem;
-          padding: 1rem;
-          overflow-x: auto;
-          font-size: 0.875rem;
-          line-height: 1.5;
-          margin: 1rem 0;
-        }
-
-        .prose-invert pre {
-          background-color: #1f2937;
-          border-color: #374151;
-        }
-
-        /* Medical highlight classes */
-        .medical-highlight {
-          background-color: ${
-            darkMode ? 'rgba(59, 130, 246, 0.1)' : 'rgba(59, 130, 246, 0.1)'
-          };
-          padding: 0.1rem 0.2rem;
-          border-radius: 0.2rem;
-          border-left: 2px solid #3b82f6;
-        }
-
+        /* Medical warning and note boxes */
         .medical-warning {
           background-color: ${
             darkMode ? 'rgba(239, 68, 68, 0.1)' : 'rgba(239, 68, 68, 0.1)'
           };
-          padding: 0.75rem;
-          border-radius: 0.375rem;
+          border: 1px solid ${
+            darkMode ? 'rgba(239, 68, 68, 0.3)' : 'rgba(239, 68, 68, 0.3)'
+          };
+          padding: 1rem;
+          border-radius: 0.5rem;
           border-left: 4px solid #ef4444;
-          margin: 1rem 0;
+          margin: 1.5rem 0;
           font-size: 0.9em;
         }
 
         .medical-note {
           background-color: ${
-            darkMode ? 'rgba(34, 197, 94, 0.1)' : 'rgba(34, 197, 94, 0.1)'
+            darkMode ? 'rgba(37, 99, 235, 0.1)' : 'rgba(59, 130, 246, 0.1)'
           };
-          padding: 0.75rem;
-          border-radius: 0.375rem;
-          border-left: 4px solid #22c55e;
-          margin: 1rem 0;
+          border: 1px solid ${
+            darkMode ? 'rgba(37, 99, 235, 0.3)' : 'rgba(59, 130, 246, 0.3)'
+          };
+          padding: 1rem;
+          border-radius: 0.5rem;
+          border-left: 4px solid ${darkMode ? '#2563eb' : '#3b82f6'};
+          margin: 1.5rem 0;
           font-size: 0.9em;
         }
 
-        /* Improve readability for medical content */
-        .prose {
-          line-height: 1.6;
-          max-width: none;
+        /* Responsive design */
+        @media (max-width: 768px) {
+          .medical-content {
+            font-size: 0.8rem;
+          }
+          
+          .medical-content h1 {
+            font-size: 1.5rem;
+          }
+          
+          .medical-content h2 {
+            font-size: 1.25rem;
+          }
+          
+          .medical-content h3 {
+            font-size: 1.1rem;
+          }
+
+          .high-yield-box {
+            padding: 1rem;
+            margin: 0.5rem 0;
+          }
+
+          .high-yield-list li {
+            font-size: 0.8rem;
+            padding-left: 1.2rem;
+          }
         }
 
-        .prose-sm {
-          font-size: 0.875rem;
-          line-height: 1.5;
-        }
-
-        .prose-sm h1 {
-          font-size: 1.75rem;
-          line-height: 1.3;
-          margin-bottom: 1rem;
-        }
-
-        .prose-sm h2 {
-          font-size: 1.375rem;
-          line-height: 1.3;
-          margin-top: 2rem;
-          margin-bottom: 1rem;
-          padding-bottom: 0.5rem;
-          border-bottom: 1px solid ${darkMode ? '#374151' : '#e5e7eb'};
-        }
-
-        .prose-sm h3 {
-          font-size: 1.125rem;
-          line-height: 1.3;
-          margin-top: 1.5rem;
-          margin-bottom: 0.75rem;
-          color: ${darkMode ? '#60a5fa' : '#2563eb'};
-        }
-
-        .prose-sm h4 {
-          font-size: 1rem;
-          line-height: 1.3;
-          margin-top: 1.25rem;
-          margin-bottom: 0.5rem;
-          font-weight: 600;
-          color: ${darkMode ? '#a78bfa' : '#7c3aed'};
-        }
-
-        .prose-sm p {
-          margin-top: 0.75rem;
-          margin-bottom: 0.75rem;
-        }
-
-        .prose-sm ul,
-        .prose-sm ol {
-          margin-top: 0.75rem;
-          margin-bottom: 0.75rem;
-        }
-
-        .prose-sm li {
-          margin-top: 0.25rem;
-          margin-bottom: 0.25rem;
-        }
-
-        /* Animation for smooth transitions */
+        /* Animation for active sections */
         .transition-all {
           transition-property: all;
           transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
@@ -1420,84 +1546,18 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
 
         /* Focus states for accessibility */
         button:focus {
-          outline: 2px solid #3b82f6;
+          outline: 2px solid ${darkMode ? '#2563eb' : '#3b82f6'};
           outline-offset: 1px;
         }
 
-        /* Loading animation enhancement */
+        /* Loading animation */
         @keyframes pulse {
-          0%,
-          100% {
-            opacity: 1;
-          }
-          50% {
-            opacity: 0.5;
-          }
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.5; }
         }
 
         .animate-pulse {
           animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-        }
-
-        /* Navigation hierarchy styling */
-        .nav-subtopic {
-          font-weight: 500;
-          font-size: 0.8rem;
-        }
-
-        .nav-heading {
-          font-weight: 400;
-          font-size: 0.75rem;
-          padding-left: 0.5rem;
-          border-left: 2px solid transparent;
-          margin-left: 0.5rem;
-        }
-
-        .nav-heading.active {
-          border-left-color: ${darkMode ? '#60a5fa' : '#3b82f6'};
-        }
-
-        /* Highlight active headings in content */
-        .prose h2.highlighted {
-          background-color: ${
-            darkMode ? 'rgba(59, 130, 246, 0.05)' : 'rgba(59, 130, 246, 0.05)'
-          };
-          margin-left: -1rem;
-          margin-right: -1rem;
-          padding-left: 1rem;
-          padding-right: 1rem;
-          border-radius: 0.25rem;
-          transition: background-color 0.3s ease;
-        }
-
-        /* Enhanced content formatting */
-        .prose strong {
-          font-weight: 600;
-          color: ${darkMode ? '#f3f4f6' : '#111827'};
-        }
-
-        .prose em {
-          font-style: italic;
-          color: ${darkMode ? '#d1d5db' : '#374151'};
-        }
-
-        /* Responsive adjustments */
-        @media (max-width: 768px) {
-          .prose-sm {
-            font-size: 0.8rem;
-          }
-          
-          .prose-sm h1 {
-            font-size: 1.5rem;
-          }
-          
-          .prose-sm h2 {
-            font-size: 1.25rem;
-          }
-          
-          .prose-sm h3 {
-            font-size: 1.1rem;
-          }
         }
       `}</style>
     </div>
