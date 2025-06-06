@@ -20,6 +20,9 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
   const [saveStatus, setSaveStatus] = useState('idle');
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [navigationItems, setNavigationItems] = useState([]);
+  const [expandedAccordions, setExpandedAccordions] = useState(new Set());
+  const [contentWidth, setContentWidth] = useState(60); // percentage
+  const [isDragging, setIsDragging] = useState(false);
 
   // Multiple pages for notes
   const [pages, setPages] = useState(['Page 1']);
@@ -30,6 +33,7 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
   const subtopicRefs = useRef({});
   const headingRefs = useRef({});
   const contentContainerRef = useRef(null);
+  const resizerRef = useRef(null);
 
   // Dark mode classes
   const bgColor = darkMode ? 'bg-gray-900' : 'bg-gray-100';
@@ -75,109 +79,62 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
   const extractHeadings = (content) => {
     if (!content) return [];
 
-    const isMarkdown = content.includes('##') && !content.includes('<h2');
+    const headings = [];
 
-    if (isMarkdown) {
-      const lines = content.split('\n');
-      const headings = [];
+    // Split content by H2 sections to properly identify hierarchy
+    if (content.includes('##')) {
+      const sections = content
+        .split(/(?=^## )/gm)
+        .filter((section) => section.trim());
 
-      lines.forEach((line, index) => {
-        // Match H2 headings (## text)
-        const h2Match = line.match(/^##\s+(.+)$/);
-        if (h2Match) {
+      sections.forEach((section, sectionIndex) => {
+        const lines = section.trim().split('\n');
+
+        // Find H2 heading
+        const h2Line = lines.find((line) => line.startsWith('## '));
+        if (h2Line) {
+          const h2Text = h2Line.replace(/^## /, '').trim();
+          const h2Id = `heading-h2-${sectionIndex}`;
+
           headings.push({
-            id: `heading-h2-${headings.filter((h) => h.level === 2).length}`,
-            text: h2Match[1].trim(),
-            originalText: h2Match[1].trim(),
-            lineNumber: index,
+            id: h2Id,
+            text: h2Text,
+            originalText: h2Text,
             level: 2,
             type: 'h2',
           });
-        }
 
-        // Match H3 headings (### text)
-        const h3Match = line.match(/^###\s+(.+)$/);
-        if (h3Match) {
-          headings.push({
-            id: `heading-h3-${headings.filter((h) => h.level === 3).length}`,
-            text: h3Match[1].trim(),
-            originalText: h3Match[1].trim(),
-            lineNumber: index,
-            level: 3,
-            type: 'h3',
-            parentH2:
-              headings.filter((h) => h.level === 2).slice(-1)[0]?.id || null,
+          // Find H3 headings within this section
+          let h3Index = 0;
+          lines.forEach((line) => {
+            if (line.startsWith('### ')) {
+              const h3Text = line.replace(/^### /, '').trim();
+              headings.push({
+                id: `heading-h3-${sectionIndex}-${h3Index}`,
+                text: h3Text,
+                originalText: h3Text,
+                level: 3,
+                type: 'h3',
+                parentH2: h2Id,
+              });
+              h3Index++;
+            }
           });
         }
       });
-
-      return headings;
-    } else {
-      // Extract from HTML content
-      const tempDiv = document.createElement('div');
-      tempDiv.innerHTML = content;
-
-      const headings = [];
-
-      // Extract H2 elements
-      const h2Elements = tempDiv.querySelectorAll('h2');
-      Array.from(h2Elements).forEach((h2, index) => {
-        headings.push({
-          id: `heading-h2-${index}`,
-          text: h2.textContent.trim(),
-          originalText: h2.textContent.trim(),
-          level: 2,
-          type: 'h2',
-        });
-      });
-
-      // Extract H3 elements
-      const h3Elements = tempDiv.querySelectorAll('h3');
-      Array.from(h3Elements).forEach((h3, index) => {
-        // Find the parent H2 by checking previous siblings
-        let parentH2 = null;
-        let previousElement = h3.previousElementSibling;
-        while (previousElement) {
-          if (previousElement.tagName === 'H2') {
-            const h2Index = Array.from(tempDiv.querySelectorAll('h2')).indexOf(
-              previousElement
-            );
-            parentH2 = `heading-h2-${h2Index}`;
-            break;
-          }
-          previousElement = previousElement.previousElementSibling;
-        }
-
-        headings.push({
-          id: `heading-h3-${index}`,
-          text: h3.textContent.trim(),
-          originalText: h3.textContent.trim(),
-          level: 3,
-          type: 'h3',
-          parentH2: parentH2,
-        });
-      });
-
-      return headings.sort((a, b) => {
-        // Sort by DOM order
-        const aElement = tempDiv.querySelector(a.type);
-        const bElement = tempDiv.querySelector(b.type);
-        return aElement && bElement
-          ? Array.from(tempDiv.querySelectorAll('h2, h3')).indexOf(aElement) -
-              Array.from(tempDiv.querySelectorAll('h2, h3')).indexOf(bElement)
-          : 0;
-      });
     }
+
+    return headings;
   };
 
-  // Enhanced navigation generation with hierarchical structure - REMOVED MAIN HEADINGS
+  // Enhanced navigation generation with hierarchical structure - INCLUDES H2 AND H3
   const generateNavigationItems = (subtopicsData) => {
     const items = [];
 
     subtopicsData.forEach((subtopic) => {
       const subtopicData = subtopic.attributes || subtopic;
 
-      // Extract and add headings with hierarchy (removed subtopic main item)
+      // Extract and add headings with hierarchy
       const headings = extractHeadings(subtopicData.content);
 
       headings.forEach((heading) => {
@@ -187,7 +144,7 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
           type: heading.type,
           subtopicId: subtopic.id,
           headingId: heading.id,
-          level: heading.level === 2 ? 0 : 1, // Adjusted levels since we removed main items
+          level: heading.level === 2 ? 0 : 1, // H2 = level 0, H3 = level 1
           parentH2: heading.parentH2
             ? `subtopic-${subtopic.id}-${heading.parentH2}`
             : null,
@@ -201,112 +158,242 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
   // Enhanced scroll function
   const scrollToItem = (item) => {
     const headingKey = `subtopic-${item.subtopicId}-${item.headingId}`;
-    const element = headingRefs.current[headingKey];
 
-    if (element && contentContainerRef.current) {
-      const container = contentContainerRef.current;
-      const elementTop = element.offsetTop;
-      const containerHeight = container.clientHeight;
-      const scrollPosition =
-        elementTop - containerHeight / 2 + element.clientHeight / 2;
-
-      container.scrollTo({
-        top: Math.max(0, scrollPosition),
-        behavior: 'smooth',
-      });
-
-      setActiveSubtopic(item.subtopicId);
-      setActiveHeading(headingKey);
+    // Expand the accordion if it's an H2 or if H3's parent H2 needs to be expanded
+    if (item.type === 'h2') {
+      setExpandedAccordions((prev) => new Set([...prev, headingKey]));
+    } else if (item.type === 'h3' && item.parentH2) {
+      setExpandedAccordions((prev) => new Set([...prev, item.parentH2]));
     }
+
+    // Small delay to allow accordion to expand
+    setTimeout(() => {
+      const element = headingRefs.current[headingKey];
+
+      if (element && contentContainerRef.current) {
+        const container = contentContainerRef.current;
+        const elementTop = element.offsetTop;
+        const containerHeight = container.clientHeight;
+        const scrollPosition =
+          elementTop - containerHeight / 2 + element.clientHeight / 2;
+
+        container.scrollTo({
+          top: Math.max(0, scrollPosition),
+          behavior: 'smooth',
+        });
+
+        setActiveSubtopic(item.subtopicId);
+        setActiveHeading(headingKey);
+      }
+    }, 100);
   };
 
-  // Enhanced markdown to HTML conversion with medical formatting
-  const renderContentWithHeadingIds = (content, subtopicId) => {
+  // Function to toggle accordion
+  const toggleAccordion = (accordionId) => {
+    setExpandedAccordions((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(accordionId)) {
+        newSet.delete(accordionId);
+      } else {
+        newSet.add(accordionId);
+      }
+      return newSet;
+    });
+  };
+
+  // Enhanced markdown to HTML conversion with accordion structure
+  const renderContentWithAccordions = (content, subtopicId) => {
     if (!content) return '';
 
-    let processedContent = content;
+    if (!content.includes('##')) return content;
 
-    const isMarkdown = content.includes('##') && !content.includes('<h2');
+    // Split content by H2 headings while preserving the headings
+    const sections = content
+      .split(/(?=^## )/gm)
+      .filter((section) => section.trim());
 
-    if (isMarkdown) {
-      // Enhanced markdown processing with medical formatting
-      processedContent = content
-        // Process High-Yield Points sections first (before other headers)
-        .replace(
-          /^##\s+(.*High-Yield Points.*)\s*\n((?:(?!^##)[\s\S])*)/gim,
-          (match, title, content) => {
-            const processedPoints = content
-              .split('\n')
-              .filter((line) => line.trim())
-              .map((line) => {
-                if (
-                  line.trim().startsWith('•') ||
-                  line.trim().startsWith('-') ||
-                  line.trim().startsWith('*')
-                ) {
-                  return `<li>${line
-                    .replace(/^[\s]*[•\-*]\s*/, '')
-                    .trim()}</li>`;
+    return sections
+      .map((section, index) => {
+        const lines = section.trim().split('\n');
+        const h2Line = lines[0];
+
+        if (!h2Line.startsWith('## ')) return '';
+
+        const title = h2Line.replace(/^## /, '').trim();
+        const isHighYield = title.toLowerCase().includes('high-yield');
+        const accordionId = `subtopic-${subtopicId}-heading-h2-${index}`;
+        const isExpanded = expandedAccordions.has(accordionId);
+
+        // Process the content (everything after the H2)
+        let sectionContent = lines.slice(1).join('\n');
+
+        // Special processing for High-Yield sections
+        if (isHighYield) {
+          const processedPoints = sectionContent
+            .split('\n')
+            .filter((line) => line.trim())
+            .map((line) => {
+              if (
+                line.trim().startsWith('•') ||
+                line.trim().startsWith('-') ||
+                line.trim().startsWith('*')
+              ) {
+                return `<li>${line.replace(/^[\s]*[•\-*]\s*/, '').trim()}</li>`;
+              }
+              return line.trim() ? `<p>${line.trim()}</p>` : '';
+            })
+            .filter((line) => line)
+            .join('\n');
+
+          sectionContent = `
+          <div class="high-yield-box">
+            <div class="high-yield-title">PANCE High-Yield Points</div>
+            <ul class="high-yield-list">
+              ${processedPoints}
+            </ul>
+          </div>
+        `;
+        } else {
+        // Process regular markdown content
+          sectionContent = sectionContent
+            // Process tables - Fixed regex and parsing
+            .replace(
+              /\n*(\|[^\n]+\|(?:\n\|[^\n]+\|)*)/g,
+              (match, tableContent) => {
+                const lines = tableContent.trim().split('\n');
+                if (lines.length < 2) return match;
+
+                const headerLine = lines[0];
+                const separatorLine = lines[1];
+
+                // Check if second line is a separator (contains dashes)
+                if (!separatorLine || !separatorLine.match(/\|[\s\-:]+\|/)) {
+                  return match;
                 }
-                return line.trim() ? `<p>${line.trim()}</p>` : '';
-              })
-              .filter((line) => line)
-              .join('\n');
 
-            return `<div class="high-yield-section">
-            <h2>${title}</h2>
-            <div class="high-yield-box">
-              <div class="high-yield-title">PANCE High-Yield Points</div>
-              <ul class="high-yield-list">
-                ${processedPoints}
-              </ul>
-            </div>
-          </div>`;
-          }
-        )
+                const dataLines = lines.slice(2);
+                
+                // Parse headers - split by | and filter out empty strings
+                const headers = headerLine
+                  .split('|')
+                  .map((cell) => cell.trim())
+                  .filter((cell) => cell !== '');
 
-        // Convert other headers (order matters - most specific first)
-        .replace(/^##### (.+)$/gm, '<h5>$1</h5>')
-        .replace(/^#### (.+)$/gm, '<h4>$1</h4>')
-        .replace(/^### (.+)$/gm, '<h3>$1</h3>')
-        .replace(/^## (.+)$/gm, '<h2>$1</h2>')
-        .replace(/^# (.+)$/gm, '<h1>$1</h1>')
+                // Parse data rows
+                const rows = dataLines
+                  .filter((line) => line.trim() && line.includes('|'))
+                  .map((line) =>
+                    line
+                      .split('|')
+                      .map((cell) => cell.trim())
+                      .filter((cell, index, arr) => {
+                        // Keep cells that correspond to headers
+                        return index > 0 && index <= headers.length;
+                      })
+                  );
 
-        // Convert bold and italic
-        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-        .replace(/\*(.+?)\*/g, '<em>$1</em>')
+                let tableHtml = '\n<table class="medical-table">\n';
+                tableHtml += '  <thead>\n    <tr>\n';
+                headers.forEach((header) => {
+                  // Process markdown in headers
+                  const processedHeader = header
+                    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+                    .replace(/\*(.+?)\*/g, '<em>$1</em>');
+                  tableHtml += `      <th>${processedHeader}</th>\n`;
+                });
+                tableHtml += '    </tr>\n  </thead>\n';
 
-        // Convert bullet points that aren't already processed
-        .replace(/^[\s]*[•\-*]\s+(.+)$/gm, '<li>$1</li>')
+                if (rows.length > 0) {
+                  tableHtml += '  <tbody>\n';
+                  rows.forEach((row) => {
+                    tableHtml += '    <tr>\n';
+                    row.forEach((cell, index) => {
+                      if (index < headers.length) {
+                        // Process markdown in cells
+                        const processedCell = cell
+                          .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+                          .replace(/\*(.+?)\*/g, '<em>$1</em>')
+                          .replace(/`([^`]+)`/g, '<code>$1</code>');
+                        tableHtml += `      <td>${processedCell}</td>\n`;
+                      }
+                    });
+                    tableHtml += '    </tr>\n';
+                  });
+                  tableHtml += '  </tbody>\n';
+                }
 
-        // Wrap consecutive <li> elements in <ul>
-        .replace(/(<li>.*<\/li>)(\s*<li>.*<\/li>)*/gs, '<ul>$&</ul>')
+                tableHtml += '</table>\n';
+                return '\n' + tableHtml;
+              }
+            )
+            // Convert headers
+            .replace(/^##### (.+)$/gm, '<h5>$1</h5>')
+            .replace(/^#### (.+)$/gm, '<h4>$1</h4>')
+            .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+            .replace(/^# (.+)$/gm, '<h1>$1</h1>')
 
-        // Convert line breaks to paragraphs
-        .split('\n\n')
-        .map((paragraph) => {
-          const trimmed = paragraph.trim();
-          if (!trimmed) return '';
+            // Convert bold and italic
+            .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+            .replace(/\*(.+?)\*/g, '<em>$1</em>')
 
-          // Don't wrap if it's already an HTML element or high-yield section
-          if (trimmed.match(/^<(h[1-6]|ul|ol|blockquote|hr|div|li)/)) {
-            return trimmed;
-          }
+            // Convert bullet points
+            .replace(/^[\s]*[•\-*]\s+(.+)$/gm, '<li>$1</li>')
 
-          // Replace single newlines with <br> within paragraphs
-          const withBreaks = trimmed.replace(/\n/g, '<br>');
-          return `<p>${withBreaks}</p>`;
-        })
-        .filter((p) => p)
-        .join('\n');
-    }
+            // Wrap consecutive <li> elements in <ul>
+            .replace(/(<li>.*<\/li>)(\s*<li>.*<\/li>)*/gs, '<ul>$&</ul>')
 
-    // Add IDs to headings for navigation
+            // Convert line breaks to paragraphs
+            .split('\n\n')
+            .map((paragraph) => {
+              const trimmed = paragraph.trim();
+              if (!trimmed) return '';
+
+              if (
+                trimmed.match(/^<(h[1-6]|ul|ol|blockquote|hr|div|li|table)/)
+              ) {
+                return trimmed;
+              }
+
+              const withBreaks = trimmed.replace(/\n/g, '<br>');
+              return `<p>${withBreaks}</p>`;
+            })
+            .filter((p) => p)
+            .join('\n');
+        }
+
+      return `
+<div class="accordion-section" data-accordion-id="${accordionId}">
+  <div 
+    class="accordion-header ${isExpanded ? 'expanded' : ''}" 
+    id="${accordionId}"
+    data-heading-key="${accordionId}"
+    data-subtopic-id="${subtopicId}"
+    data-heading-level="2"
+    onclick="window.toggleAccordion('${accordionId}')"
+  >
+    <h2 class="accordion-title">${title}</h2>
+    <svg class="accordion-icon ${isExpanded ? 'rotated' : ''}" width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+      <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+    </svg>
+  </div>
+  <div class="accordion-content ${isExpanded ? 'expanded' : ''}">
+    <div class="accordion-body">
+      ${sectionContent}
+    </div>
+  </div>
+</div>
+`;
+      })
+      .join('');
+  };
+
+  // Add IDs to all headings after rendering
+  const addHeadingIds = (content, subtopicId) => {
     const tempDiv = document.createElement('div');
-    tempDiv.innerHTML = processedContent;
+    tempDiv.innerHTML = content;
 
-    // Add IDs to H2 elements
-    const h2Elements = tempDiv.querySelectorAll('h2');
+    // Add IDs to H2 elements (accordion headers)
+    const h2Elements = tempDiv.querySelectorAll('.accordion-title');
     h2Elements.forEach((h2, index) => {
       const headingId = `subtopic-${subtopicId}-heading-h2-${index}`;
       h2.setAttribute('id', headingId);
@@ -315,18 +402,33 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
       h2.setAttribute('data-heading-level', '2');
     });
 
-    // Add IDs to H3 elements
-    const h3Elements = tempDiv.querySelectorAll('h3');
-    h3Elements.forEach((h3, index) => {
-      const headingId = `subtopic-${subtopicId}-heading-h3-${index}`;
-      h3.setAttribute('id', headingId);
-      h3.setAttribute('data-heading-key', headingId);
-      h3.setAttribute('data-subtopic-id', subtopicId);
-      h3.setAttribute('data-heading-level', '3');
+    // Add IDs to H3 elements within accordion content
+    const accordionSections = tempDiv.querySelectorAll('.accordion-section');
+    accordionSections.forEach((section, sectionIndex) => {
+      const h3Elements = section.querySelectorAll('h3');
+      h3Elements.forEach((h3, h3Index) => {
+        const headingId = `subtopic-${subtopicId}-heading-h3-${sectionIndex}-${h3Index}`;
+        h3.setAttribute('id', headingId);
+        h3.setAttribute('data-heading-key', headingId);
+        h3.setAttribute('data-subtopic-id', subtopicId);
+        h3.setAttribute('data-heading-level', '3');
+        h3.setAttribute(
+          'data-parent-h2',
+          `subtopic-${subtopicId}-heading-h2-${sectionIndex}`
+        );
+      });
     });
 
     return tempDiv.innerHTML;
   };
+
+  // Add global function for accordion toggle
+  useEffect(() => {
+    window.toggleAccordion = toggleAccordion;
+    return () => {
+      delete window.toggleAccordion;
+    };
+  }, []);
 
   // Intersection Observer for auto-highlighting active section
   useEffect(() => {
@@ -369,7 +471,7 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
     });
 
     return () => observer.disconnect();
-  }, [navigationItems]);
+  }, [navigationItems, expandedAccordions]);
 
   // Set up heading refs after content is rendered
   useEffect(() => {
@@ -383,7 +485,7 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
         headings.forEach((heading) => {
           const headingKey = `subtopic-${subtopic.id}-${heading.id}`;
           const element = contentContainerRef.current.querySelector(
-            `#${headingKey}`
+            `#${headingKey}, [data-heading-key="${headingKey}"]`
           );
           if (element) {
             headingRefs.current[headingKey] = element;
@@ -391,7 +493,43 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
         });
       });
     }
-  }, [subtopics]);
+  }, [subtopics, expandedAccordions]);
+
+  // Drag functionality for resizer
+  const handleMouseDown = (e) => {
+    setIsDragging(true);
+    e.preventDefault();
+  };
+
+  const handleMouseMove = (e) => {
+    if (!isDragging) return;
+
+    const container = document.querySelector('.content-resizer-container');
+    if (!container) return;
+
+    const rect = container.getBoundingClientRect();
+    const newWidth = ((e.clientX - rect.left) / rect.width) * 100;
+
+    // Constrain between 30% and 80%
+    const constrainedWidth = Math.min(80, Math.max(30, newWidth));
+    setContentWidth(constrainedWidth);
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
+
+  useEffect(() => {
+    if (isDragging) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+
+      return () => {
+        document.removeEventListener('mousemove', handleMouseMove);
+        document.removeEventListener('mouseup', handleMouseUp);
+      };
+    }
+  }, [isDragging]);
 
   // Fetch topic and subtopics
   useEffect(() => {
@@ -922,21 +1060,25 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
                         <button
                           key={item.id}
                           onClick={() => scrollToItem(item)}
-                          className={`block w-full text-left p-2 transition-all duration-200 ${
-                            item.level === 1 ? 'ml-4' : ''
+                          className={`block w-full text-left p-2 rounded transition-all duration-200 ${
+                            item.level === 1 ? 'ml-4 text-xs' : 'text-sm'
                           } ${
                             isActiveHeading
                               ? `${
-                                  darkMode ? 'text-blue-600' : 'text-blue-500'
+                                  darkMode
+                                    ? 'text-blue-400 bg-blue-900/20'
+                                    : 'text-blue-600 bg-blue-50'
                                 } font-semibold border-l-3 border-blue-500`
                               : `${
                                   darkMode ? 'text-gray-300' : 'text-gray-700'
                                 } hover:${
-                                  darkMode ? 'text-blue-600' : 'text-blue-500'
+                                  darkMode
+                                    ? 'text-blue-400 hover:bg-blue-900/10'
+                                    : 'text-blue-600 hover:bg-blue-50'
                                 }`
                           }`}
                         >
-                          <span className='text-xs'>{item.text}</span>
+                          <span>{item.text}</span>
                         </button>
                       );
                     })}
@@ -947,17 +1089,20 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
           </div>
         )}
 
-        {/* Main Content Area */}
-        <div className='flex-1 flex overflow-hidden'>
+        {/* Main Content Area with Resizer */}
+        <div className='flex-1 flex overflow-hidden content-resizer-container'>
           {/* Scrollable Content Display */}
           {(viewMode === 'both' || viewMode === 'content') && (
             <div
-              className={`${
-                viewMode === 'both' ? 'flex-1' : 'w-full'
-              } overflow-y-auto`}
+              className={`overflow-y-auto ${
+                viewMode === 'both' ? '' : 'w-full'
+              }`}
+              style={{
+                width: viewMode === 'both' ? `${contentWidth}%` : '100%',
+              }}
               ref={contentContainerRef}
             >
-              <div className='p-4 space-y-8'>
+              <div className='p-4 space-y-0'>
                 {subtopics.length === 0 ? (
                   <div
                     className={`text-center mt-16 ${
@@ -995,25 +1140,26 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
                         ref={(el) => (subtopicRefs.current[subtopic.id] = el)}
                         data-subtopic-id={subtopic.id}
                         className={`scroll-mt-6 ${
-                          index !== subtopics.length - 1 ? 'border-b pb-8' : ''
+                          index !== subtopics.length - 1
+                            ? 'border-b pb-8 mb-8'
+                            : ''
                         } ${darkMode ? 'border-gray-600' : 'border-gray-200'}`}
                       >
                         <h1
-                          className={`text-xl font-bold ${textColor} mb-3 sticky top-0 ${
-                            darkMode ? 'bg-gray-900' : 'bg-gray-100'
-                          } py-2 z-10 border-b ${
+                          className={`text-2xl font-bold ${textColor} mb-6 py-3 border-b ${
                             darkMode ? 'border-gray-600' : 'border-gray-200'
                           }`}
                         >
                           {subtopicData.title}
                         </h1>
                         <div
-                          className={`prose ${
-                            darkMode ? 'prose-invert' : ''
-                          } prose-xs max-w-none ${textColor} medical-content`}
+                          className={`medical-content-accordion ${textColor}`}
                           dangerouslySetInnerHTML={{
-                            __html: renderContentWithHeadingIds(
-                              subtopicData.content,
+                            __html: addHeadingIds(
+                              renderContentWithAccordions(
+                                subtopicData.content,
+                                subtopic.id
+                              ),
                               subtopic.id
                             ),
                           }}
@@ -1026,14 +1172,50 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
             </div>
           )}
 
+          {/* Resizer */}
+          {viewMode === 'both' && (
+            <div
+              ref={resizerRef}
+              className={`w-1 ${
+                darkMode
+                  ? 'bg-gray-600 hover:bg-gray-500'
+                  : 'bg-gray-300 hover:bg-gray-400'
+              } cursor-col-resize transition-colors flex items-center justify-center relative group`}
+              onMouseDown={handleMouseDown}
+            >
+              <div
+                className={`absolute inset-y-0 flex items-center justify-center w-6 ${
+                  darkMode
+                    ? 'text-gray-500 group-hover:text-gray-400'
+                    : 'text-gray-400 group-hover:text-gray-600'
+                }`}
+              >
+                <svg
+                  width='12'
+                  height='12'
+                  viewBox='0 0 12 12'
+                  fill='currentColor'
+                >
+                  <path
+                    d='M2 2L2 10M5 2L5 10M7 2L7 10M10 2L10 10'
+                    stroke='currentColor'
+                    strokeWidth='1'
+                    strokeLinecap='round'
+                  />
+                </svg>
+              </div>
+            </div>
+          )}
+
           {/* Notes Section */}
           {(viewMode === 'both' || viewMode === 'notes') && (
             <div
-              className={`${
-                viewMode === 'both' ? 'w-80' : 'w-full'
-              } ${cardBgColor} border-l ${
+              className={`${cardBgColor} border-l ${
                 darkMode ? 'border-gray-600' : 'border-gray-200'
-              } flex flex-col`}
+              } flex flex-col ${viewMode === 'both' ? '' : 'w-full'}`}
+              style={{
+                width: viewMode === 'both' ? `${100 - contentWidth}%` : '100%',
+              }}
             >
               <div className='p-3 border-b border-gray-600'>
                 <div className='flex justify-between items-center mb-3'>
@@ -1141,425 +1323,498 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
         </div>
       </div>
 
-      {/* Enhanced Custom CSS for Medical Content and High-Yield Points */}
+      {/* Enhanced Custom CSS for Accordion and Medical Content */}
       <style>{`
-        /* High-Yield Points Special Styling - UPDATED WITH EXACT COLORS */
-        .high-yield-section {
-          margin: 2rem 0;
-        }
+       /* Accordion Styles - IMPROVED DESIGN */
+       .accordion-section {
+         margin-bottom: 0;
+         border-bottom: 1px solid ${darkMode ? '#374151' : '#e5e7eb'};
+         background: ${darkMode ? '#1f2937' : '#ffffff'};
+         border-radius: 8px;
+         margin-bottom: 1rem;
+         overflow: hidden;
+         box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+       }
 
-        .high-yield-box {
-          background: ${
-            darkMode
-              ? '#20193A'
-              : 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 50%, #e2e8f0 100%)'
-          };
-          border-radius: 12px;
-          padding: 1.5rem;
-          margin: 1rem 0;
-          box-shadow: 0 8px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
-          border: ${
-            darkMode ? '1px solid rgba(93, 92, 222, 0.3)' : '2px solid #7c3aed'
-          };
-          position: relative;
-          overflow: hidden;
-        }
+       .accordion-section:last-child {
+         margin-bottom: 2rem;
+       }
 
-        .high-yield-box::before {
-          content: '';
-          position: absolute;
-          top: 0;
-          left: 0;
-          right: 0;
-          bottom: 0;
-          background: ${
-            darkMode
-              ? 'rgba(93, 92, 222, 0.1)'
-              : 'linear-gradient(45deg, rgba(124, 58, 237, 0.05) 0%, rgba(167, 139, 250, 0.03) 100%)'
-          };
-          pointer-events: none;
-        }
+      .accordion-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.25rem 1.5rem;
+  cursor: pointer;
+  background: ${darkMode ? '#374151' : '#f8fafc'};
+  border-bottom: 1px solid ${darkMode ? '#4b5563' : '#e2e8f0'};
+  transition: all 0.2s ease;
+}
 
-        .high-yield-icon {
-          font-size: 1.5rem;
-          margin-bottom: 0.5rem;
-          display: block;
-          filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
-        }
+.accordion-header.expanded {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: ${darkMode ? '#4b5563' : '#e2e8f0'};
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
 
-        .high-yield-title {
-          color: ${darkMode ? '#fbbf24' : '#7c3aed'};
-          font-weight: 700;
-          font-size: 0.75rem;
-          margin-bottom: 1rem;
-          text-transform: uppercase;
-          letter-spacing: 0.05em;
-          text-shadow: ${
-            darkMode
-              ? '0 1px 2px rgba(0, 0, 0, 0.5)'
-              : '0 1px 2px rgba(124, 58, 237, 0.3)'
-          };
-          position: relative;
-          z-index: 1;
-        }
+       .accordion-title {
+         margin: 0;
+         font-size: 1.125rem;
+         font-weight: 600;
+         color: ${darkMode ? '#e5e7eb' : '#1f2937'};
+         flex: 1;
+       }
 
-        .high-yield-list {
-          list-style: none;
-          padding: 0;
-          margin: 0;
-          position: relative;
-          z-index: 1;
-        }
+       .accordion-icon {
+         transition: transform 0.2s ease;
+         color: ${darkMode ? '#9ca3af' : '#6b7280'};
+         flex-shrink: 0;
+         margin-left: 1rem;
+       }
 
-        .high-yield-list li {
-          color: ${darkMode ? '#ffffff' : '#5b21b6'} !important;
-          font-size: 0.75rem;
-          line-height: 1.6;
-          margin-bottom: 0.75rem;
-          padding-left: 1.5rem;
-          position: relative;
-          font-weight: 400;
-          text-shadow: ${darkMode ? '0 1px 2px rgba(0, 0, 0, 0.2)' : 'none'};
-        }
+       .accordion-icon.rotated {
+         transform: rotate(180deg);
+       }
 
-        .high-yield-list li::before {
-          content: '•';
-          position: absolute;
-          left: 0;
-          color: ${darkMode ? '#ffffff' : '#7c3aed'};
-          font-weight: bold;
-          font-size: 1.2rem;
-          top: 0;
-        }
+       .accordion-content {
+         max-height: 0;
+         overflow: hidden;
+         transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+         background: ${darkMode ? '#1f2937' : '#ffffff'};
+       }
 
-        .high-yield-list li:last-child {
-          margin-bottom: 0;
-        }
+       .accordion-content.expanded {
+         max-height: none;
+         overflow: visible;
+       }
 
-        /* Override any conflicting styles for high-yield content */
-        .high-yield-box .high-yield-list li {
-          color: ${darkMode ? '#ffffff' : '#5b21b6'} !important;
-        }
+       .accordion-body {
+         padding: 2rem 1.5rem;
+       }
 
-        .high-yield-box * {
-          color: ${darkMode ? '#ffffff' : 'inherit'} !important;
-        }
+       /* High-Yield Points Special Styling - KEPT AS IS */
+       .high-yield-section {
+         margin: 0;
+       }
 
-        .high-yield-section h2 {
-          display: none; /* Hide the duplicate heading */
-        } 
+       .high-yield-box {
+         background: ${
+           darkMode
+             ? '#20193A'
+             : 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 50%, #e2e8f0 100%)'
+         };
+         border-radius: 12px;
+         padding: 1.5rem;
+         margin: 1rem 0;
+         box-shadow: 0 8px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+         border: ${
+           darkMode ? '1px solid rgba(93, 92, 222, 0.3)' : '2px solid #7c3aed'
+         };
+         position: relative;
+         overflow: hidden;
+       }
 
-        /* Enhanced dark mode styling */
-        .dark-quill .ql-toolbar {
-          border-color: #4b5563;
-          background-color: #374151;
-          padding: 6px;
-        }
+       .high-yield-box::before {
+         content: '';
+         position: absolute;
+         top: 0;
+         left: 0;
+         right: 0;
+         bottom: 0;
+         background: ${
+           darkMode
+             ? 'rgba(93, 92, 222, 0.1)'
+             : 'linear-gradient(45deg, rgba(124, 58, 237, 0.05) 0%, rgba(167, 139, 250, 0.03) 100%)'
+         };
+         pointer-events: none;
+       }
 
-        .dark-quill .ql-toolbar .ql-stroke {
-          stroke: #d1d5db;
-        }
+       .high-yield-title {
+         color: ${darkMode ? '#fbbf24' : '#7c3aed'};
+         font-weight: 700;
+         font-size: 0.875rem;
+         margin-bottom: 1rem;
+         text-transform: uppercase;
+         letter-spacing: 0.05em;
+         text-shadow: ${
+           darkMode
+             ? '0 1px 2px rgba(0, 0, 0, 0.5)'
+             : '0 1px 2px rgba(124, 58, 237, 0.3)'
+         };
+         position: relative;
+         z-index: 1;
+       }
 
-        .dark-quill .ql-toolbar .ql-fill {
-          fill: #d1d5db;
-        }
+       .high-yield-list {
+         list-style: none;
+         padding: 0;
+         margin: 0;
+         position: relative;
+         z-index: 1;
+       }
 
-        .dark-quill .ql-toolbar .ql-picker-label {
-          color: #d1d5db;
-        }
+       .high-yield-list li {
+         color: ${darkMode ? '#ffffff' : '#5b21b6'} !important;
+         font-size: 0.875rem;
+         line-height: 1.6;
+         margin-bottom: 0.75rem;
+         padding-left: 1.5rem;
+         position: relative;
+         font-weight: 400;
+         text-shadow: ${darkMode ? '0 1px 2px rgba(0, 0, 0, 0.2)' : 'none'};
+       }
 
-        .dark-quill .ql-container {
-          border-color: #4b5563;
-          background-color: #1f2937;
-          color: #e5e7eb;
-        }
+       .high-yield-list li::before {
+         content: '•';
+         position: absolute;
+         left: 0;
+         color: ${darkMode ? '#ffffff' : '#7c3aed'};
+         font-weight: bold;
+         font-size: 1.2rem;
+         top: 0;
+       }
 
-        .dark-quill .ql-editor {
-          color: #e5e7eb;
-          padding: 8px;
-          font-size: 14px;
-        }
+       .high-yield-list li:last-child {
+         margin-bottom: 0;
+       }
 
-        .dark-quill .ql-editor.ql-blank::before {
-          color: #9ca3af;
-        }
+       /* Override any conflicting styles for high-yield content */
+       .high-yield-box .high-yield-list li {
+         color: ${darkMode ? '#ffffff' : '#5b21b6'} !important;
+       }
 
-        .dark-quill .ql-tooltip {
-          background-color: #374151;
-          border-color: #4b5563;
-          color: #e5e7eb;
-        }
+       .high-yield-box * {
+         color: ${darkMode ? '#ffffff' : 'inherit'} !important;
+       }
 
-        .dark-quill .ql-tooltip input {
-          background-color: #1f2937;
-          border-color: #4b5563;
-          color: #e5e7eb;
-        }
+       /* Medical content - NEUTRAL COLORS EXCEPT HIGH-YIELD */
+       .medical-content-accordion h3 {
+         color: ${darkMode ? '#e5e7eb' : '#374151'};
+         font-weight: 600;
+         margin: 1.5rem 0 0.75rem 0;
+         font-size: 1.1rem;
+         scroll-margin-top: 80px;
+         position: relative;
+         padding-top: 0.5rem;
+       }
 
-        /* Compact quill editor */
-        .compact-quill .ql-toolbar {
-          padding: 4px;
-        }
+       .medical-content-accordion h4 {
+         color: ${darkMode ? '#e5e7eb' : '#374151'};
+         font-weight: 600;
+         margin-top: 1rem;
+         margin-bottom: 0.5rem;
+         font-size: 1rem;
+       }
 
-        .compact-quill .ql-toolbar .ql-formats {
-          margin-right: 8px;
-        }
+       .medical-content-accordion ul {
+         margin: 1rem 0;
+         padding-left: 1.5rem;
+       }
 
-        .compact-quill .ql-editor {
-          padding: 6px;
-          font-size: 13px;
-          line-height: 1.4;
-        }
+       .medical-content-accordion li {
+         margin: 0.5rem 0;
+         line-height: 1.6;
+         color: ${darkMode ? '#e5e7eb' : '#374151'};
+         font-size: 0.875rem;
+       }
 
-        .compact-quill .ql-toolbar button {
-          width: 24px;
-          height: 24px;
-          padding: 2px;
-        }
+       .medical-content-accordion ul > li {
+         list-style-type: none;
+         position: relative;
+       }
 
-        .compact-quill .ql-toolbar button svg {
-          width: 12px;
-          height: 12px;
-        }
+       .medical-content-accordion ul > li::before {
+         content: '•';
+         color:${darkMode ? '#9ca3af' : '#6b7280'};
+         font-weight: bold;
+         position: absolute;
+         left: -1.25rem;
+         font-size: 1em;
+       }
 
-        /* Medical content specific styling */
-        .medical-content h2 {
-          position: relative;
-          scroll-margin-top: 80px;
-          padding-top: 0.75rem;
-          margin-top: 1.5rem;
-          margin-bottom: 0.75rem;
-          border-bottom: 2px solid ${darkMode ? '#374151' : '#e5e7eb'};
-          padding-bottom: 0.5rem;
-          color: ${darkMode ? '#2563eb' : '#3b82f6'};
-          font-weight: 700;
-          font-size: 1.25rem;
-        }
+       .medical-content-accordion strong {
+         font-weight: 600;
+         color: ${darkMode ? '#e5e7eb' : '#374151'};
+         font-size: 0.875rem;
+       }
 
-        .medical-content h3 {
-          position: relative;
-          scroll-margin-top: 80px;
-          padding-top: 0.5rem;
-          margin-top: 1rem;
-          margin-bottom: 0.5rem;
-          color: ${darkMode ? '#a78bfa' : '#7c3aed'};
-          font-weight: 600;
-          border-left: 3px solid ${darkMode ? '#a78bfa' : '#7c3aed'};
-          padding-left: 0.5rem;
-          font-size: 1.1rem;
-        }
+       .medical-content-accordion code {
+         background-color: ${darkMode ? '#374151' : '#f3f4f6'};
+         color: ${darkMode ? '#e5e7eb' : '#374151'};
+         padding: 0.15rem 0.3rem;
+         border-radius: 0.2rem;
+         font-size: 0.8rem;
+         font-weight: 500;
+         border: 1px solid ${darkMode ? '#4b5563' : '#e5e7eb'};
+       }
 
-        .medical-content h4 {
-          color: ${darkMode ? '#2563eb' : '#3b82f6'};
-          font-weight: 600;
-          margin-top: 1rem;
-          margin-bottom: 0.4rem;
-          font-size: 1rem;
-        }
+       .medical-content-accordion p {
+         font-size: 0.875rem;
+         line-height: 1.6;
+         margin: 0.875rem 0;
+         color: ${darkMode ? '#e5e7eb' : '#374151'};
+       }
 
-        /* Enhanced list styling for medical content */
-        .medical-content ul {
-          margin: 0.75rem 0;
-          padding-left: 1.25rem;
-        }
+       .medical-content-accordion table {
+         border-collapse: collapse;
+         margin: 1.5rem 0;
+         font-size: 0.875rem;
+         width: 100%;
+         box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+         border-radius: 0.5rem;
+         overflow: hidden;
+       }
 
-        .medical-content li {
-          margin: 0.4rem 0;
-          line-height: 1.5;
-          color: ${darkMode ? '#e5e7eb' : '#374151'};
-          font-size: 0.875rem;
-        }
+       .medical-content-accordion th,
+       .medical-content-accordion td {
+         padding: 0.75rem;
+         border: 1px solid ${darkMode ? '#4b5563' : '#d1d5db'};
+         text-align: left;
+         color: ${darkMode ? '#e5e7eb' : '#374151'};
+       }
 
-        .medical-content ul > li {
-          list-style-type: none;
-          position: relative;
-        }
+       .medical-content-accordion th {
+         background-color: ${darkMode ? '#374151' : '#f8fafc'};
+         font-weight: 600;
+         font-size: 0.875em;
+         color: ${darkMode ? '#f9fafb' : '#111827'};
+       }
 
-        .medical-content ul > li::before {
-          content: '•';
-          color: ${darkMode ? '#2563eb' : '#3b82f6'};
-          font-weight: bold;
-          position: absolute;
-          left: -1rem;
-          font-size: 1em;
-        }
+       .medical-content-accordion blockquote {
+         border-left: 4px solid ${darkMode ? '#4b5563' : '#d1d5db'};
+         background-color: ${darkMode ? '#374151' : '#f9fafb'};
+         padding: 1rem 1.5rem;
+         margin: 1.5rem 0;
+         border-radius: 0 0.5rem 0.5rem 0;
+         font-style: italic;
+         color: ${darkMode ? '#e5e7eb' : '#374151'};
+       }
 
-        /* Strong text styling - PURPLE FOR EMPHASIS */
-        .medical-content strong {
-          font-weight: 600;
-          color: ${darkMode ? '#a78bfa' : '#7c3aed'};
-          background: ${
-            darkMode ? 'rgba(167, 139, 250, 0.1)' : 'rgba(124, 58, 237, 0.1)'
-          };
-          padding: 0.05rem 0.15rem;
-          border-radius: 0.15rem;
-          font-size: 0.875rem;
-        }
+       /* Enhanced dark mode styling for Quill */
+       .dark-quill .ql-toolbar {
+         border-color: #4b5563;
+         background-color: #374151;
+         padding: 6px;
+       }
 
-        /* Code styling */
-        .medical-content code {
-          background-color: ${darkMode ? '#374151' : '#f3f4f6'};
-          color: ${darkMode ? '#2563eb' : '#3b82f6'};
-          padding: 0.15rem 0.3rem;
-          border-radius: 0.2rem;
-          font-size: 0.8rem;
-          font-weight: 500;
-          border: 1px solid ${darkMode ? '#4b5563' : '#e5e7eb'};
-        }
+       .dark-quill .ql-toolbar .ql-stroke {
+         stroke: #d1d5db;
+       }
 
-        .medical-content p {
-          font-size: 0.875rem;
-          line-height: 1.6;
-          margin: 0.75rem 0;
-        }
+       .dark-quill .ql-toolbar .ql-fill {
+         fill: #d1d5db;
+       }
 
-        /* Table styling */
-        .medical-content table {
-          border-collapse: collapse;
-          margin: 1.5rem 0;
-          font-size: 0.875rem;
-          width: 100%;
-          box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
-          border-radius: 0.5rem;
-          overflow: hidden;
-        }
+       .dark-quill .ql-toolbar .ql-picker-label {
+         color: #d1d5db;
+       }
 
-        .medical-content th,
-        .medical-content td {
-          padding: 0.75rem;
-          border: 1px solid ${darkMode ? '#4b5563' : '#d1d5db'};
-          text-align: left;
-        }
+       .dark-quill .ql-container {
+         border-color: #4b5563;
+         background-color: #1f2937;
+         color: #e5e7eb;
+       }
 
-        .medical-content th {
-          background-color: ${darkMode ? '#374151' : '#f8fafc'};
-          font-weight: 600;
-          font-size: 0.875em;
-          color: ${darkMode ? '#f9fafb' : '#111827'};
-        }
+       .dark-quill .ql-editor {
+         color: #e5e7eb;
+         padding: 8px;
+         font-size: 14px;
+       }
 
-        /* Blockquote styling */
-        .medical-content blockquote {
-          border-left: 4px solid ${darkMode ? '#2563eb' : '#3b82f6'};
-          background-color: ${
-            darkMode ? 'rgba(37, 99, 235, 0.1)' : 'rgba(59, 130, 246, 0.05)'
-          };
-          padding: 1rem 1.5rem;
-          margin: 1.5rem 0;
-          border-radius: 0 0.5rem 0.5rem 0;
-          font-style: italic;
-        }
+       .dark-quill .ql-editor.ql-blank::before {
+         color: #9ca3af;
+       }
 
-        /* Navigation hierarchy improvements */
-        .border-l-3 {
-          border-left-width: 3px;
-          transition: all 0.2s ease-in-out;
-        }
+       .dark-quill .ql-tooltip {
+         background-color: #374151;
+         border-color: #4b5563;
+         color: #e5e7eb;
+       }
 
-        /* Smooth scrolling */
-        .scroll-smooth {
-          scroll-behavior: smooth;
-        }
+       .dark-quill .ql-tooltip input {
+         background-color: #1f2937;
+         border-color: #4b5563;
+         color: #e5e7eb;
+       }
 
-        /* Custom scrollbar */
-        .overflow-y-auto::-webkit-scrollbar {
-          width: 6px;
-        }
+       /* Compact quill editor */
+       .compact-quill .ql-toolbar {
+         padding: 4px;
+       }
 
-        .overflow-y-auto::-webkit-scrollbar-track {
-          background: ${darkMode ? '#1f2937' : '#f1f5f9'};
-        }
+       .compact-quill .ql-toolbar .ql-formats {
+         margin-right: 8px;
+       }
 
-        .overflow-y-auto::-webkit-scrollbar-thumb {
-          background: ${darkMode ? '#4b5563' : '#cbd5e1'};
-          border-radius: 3px;
-        }
+       .compact-quill .ql-editor {
+         padding: 6px;
+         font-size: 13px;
+         line-height: 1.4;
+       }
 
-        .overflow-y-auto::-webkit-scrollbar-thumb:hover {
-          background: ${darkMode ? '#6b7280' : '#94a3b8'};
-        }
+       .compact-quill .ql-toolbar button {
+         width: 24px;
+         height: 24px;
+         padding: 2px;
+       }
 
-        /* Medical warning and note boxes */
-        .medical-warning {
-          background-color: ${
-            darkMode ? 'rgba(239, 68, 68, 0.1)' : 'rgba(239, 68, 68, 0.1)'
-          };
-          border: 1px solid ${
-            darkMode ? 'rgba(239, 68, 68, 0.3)' : 'rgba(239, 68, 68, 0.3)'
-          };
-          padding: 1rem;
-          border-radius: 0.5rem;
-          border-left: 4px solid #ef4444;
-          margin: 1.5rem 0;
-          font-size: 0.9em;
-        }
+       .compact-quill .ql-toolbar button svg {
+         width: 12px;
+         height: 12px;
+       }
 
-        .medical-note {
-          background-color: ${
-            darkMode ? 'rgba(37, 99, 235, 0.1)' : 'rgba(59, 130, 246, 0.1)'
-          };
-          border: 1px solid ${
-            darkMode ? 'rgba(37, 99, 235, 0.3)' : 'rgba(59, 130, 246, 0.3)'
-          };
-          padding: 1rem;
-          border-radius: 0.5rem;
-          border-left: 4px solid ${darkMode ? '#2563eb' : '#3b82f6'};
-          margin: 1.5rem 0;
-          font-size: 0.9em;
-        }
+       /* Navigation hierarchy improvements */
+       .border-l-3 {
+         border-left-width: 3px;
+         transition: all 0.2s ease-in-out;
+       }
 
-        /* Responsive design */
-        @media (max-width: 768px) {
-          .medical-content {
-            font-size: 0.8rem;
-          }
-          
-          .medical-content h1 {
-            font-size: 1.5rem;
-          }
-          
-          .medical-content h2 {
-            font-size: 1.25rem;
-          }
-          
-          .medical-content h3 {
-            font-size: 1.1rem;
-          }
+       /* Smooth scrolling */
+       .scroll-smooth {
+         scroll-behavior: smooth;
+       }
 
-          .high-yield-box {
-            padding: 1rem;
-            margin: 0.5rem 0;
-          }
+       /* Custom scrollbar */
+       .overflow-y-auto::-webkit-scrollbar {
+         width: 6px;
+       }
 
-          .high-yield-list li {
-            font-size: 0.8rem;
-            padding-left: 1.2rem;
-          }
-        }
+       .overflow-y-auto::-webkit-scrollbar-track {
+         background: ${darkMode ? '#1f2937' : '#f1f5f9'};
+       }
 
-        /* Animation for active sections */
-        .transition-all {
-          transition-property: all;
-          transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-          transition-duration: 200ms;
-        }
+       .overflow-y-auto::-webkit-scrollbar-thumb {
+         background: ${darkMode ? '#4b5563' : '#cbd5e1'};
+         border-radius: 3px;
+       }
 
-        /* Focus states for accessibility */
-        button:focus {
-          outline: 2px solid ${darkMode ? '#2563eb' : '#3b82f6'};
-          outline-offset: 1px;
-        }
+       .overflow-y-auto::-webkit-scrollbar-thumb:hover {
+         background: ${darkMode ? '#6b7280' : '#94a3b8'};
+       }
 
-        /* Loading animation */
-        @keyframes pulse {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.5; }
-        }
+       /* Resizer cursor */
+       .cursor-col-resize {
+         cursor: col-resize;
+       }
 
-        .animate-pulse {
-          animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-        }
-      `}</style>
+       /* Dragging state */
+       ${
+         isDragging
+           ? `
+         .content-resizer-container * {
+           user-select: none;
+           pointer-events: none;
+         }
+         
+         .content-resizer-container {
+           cursor: col-resize;
+         }
+       `
+           : ''
+       }
+
+       /* Better visual feedback for navigation items */
+       nav button {
+         border-radius: 0.375rem;
+         margin-bottom: 0.125rem;
+       }
+
+       nav button:hover {
+         transform: translateX(2px);
+       }
+
+       /* Ensure accordion headers are clickable */
+       .accordion-header {
+         -webkit-user-select: none;
+         -moz-user-select: none;
+         -ms-user-select: none;
+         user-select: none;
+       }
+
+       /* Prevent text selection during resize */
+       .content-resizer-container.dragging {
+         -webkit-user-select: none;
+         -moz-user-select: none;
+         -ms-user-select: none;
+         user-select: none;
+       }
+
+       /* Focus states for accessibility */
+       button:focus {
+         outline: 2px solid ${darkMode ? '#2563eb' : '#3b82f6'};
+         outline-offset: 1px;
+       }
+
+       .accordion-header:focus {
+         outline: 2px solid ${darkMode ? '#2563eb' : '#3b82f6'};
+         outline-offset: -2px;
+       }
+
+       /* Loading animation */
+       @keyframes pulse {
+         0%, 100% { opacity: 1; }
+         50% { opacity: 0.5; }
+       }
+
+       .animate-pulse {
+         animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+       }
+
+       /* Responsive design */
+       @media (max-width: 768px) {
+         .medical-content-accordion {
+           font-size: 0.8rem;
+         }
+         
+         .accordion-header {
+           padding: 1rem;
+         }
+
+         .accordion-title {
+           font-size: 1rem;
+         }
+
+         .accordion-body {
+           padding: 1.5rem 1rem;
+         }
+
+         .high-yield-box {
+           padding: 1rem;
+           margin: 0.5rem 0;
+         }
+
+         .high-yield-list li {
+           font-size: 0.8rem;
+           padding-left: 1.2rem;
+         }
+       }
+
+       /* Animation for active sections */
+       .transition-all {
+         transition-property: all;
+         transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+         transition-duration: 200ms;
+       }
+
+       /* Accordion animation improvements */
+       .accordion-content {
+         transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+       }
+
+       /* Better spacing for accordion sections */
+       .accordion-section + .accordion-section {
+         margin-top: 0;
+       }
+
+       /* Ensure proper heading IDs for navigation */
+       .medical-content-accordion h2[id],
+       .medical-content-accordion h3[id] {
+         scroll-margin-top: 80px;
+       }
+
+     `}</style>
     </div>
   );
 };
