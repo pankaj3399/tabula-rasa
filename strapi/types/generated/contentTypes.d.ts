@@ -420,7 +420,7 @@ export interface ApiSubtopicSubtopic extends Struct.CollectionTypeSchema {
     draftAndPublish: true;
   };
   attributes: {
-    content: Schema.Attribute.Blocks;
+    content: Schema.Attribute.RichText & Schema.Attribute.Required;
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
@@ -489,20 +489,15 @@ export interface ApiTopicTopic extends Struct.CollectionTypeSchema {
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
-    diagnosis_overview: Schema.Attribute.RichText;
-    diagnostic_tools: Schema.Attribute.Component<'common.text-item', true>;
-    highyieldPoints: Schema.Attribute.RichText;
-    introduction: Schema.Attribute.RichText;
+    description: Schema.Attribute.Text;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<'oneToMany', 'api::topic.topic'> &
       Schema.Attribute.Private;
-    management: Schema.Attribute.RichText & Schema.Attribute.Required;
+    name: Schema.Attribute.String & Schema.Attribute.Required;
     publishedAt: Schema.Attribute.DateTime;
-    slug: Schema.Attribute.UID<'title'> & Schema.Attribute.Required;
+    slug: Schema.Attribute.UID<'name'> & Schema.Attribute.Required;
     subtopics: Schema.Attribute.Relation<'oneToMany', 'api::subtopic.subtopic'>;
     system: Schema.Attribute.Relation<'manyToOne', 'api::system.system'>;
-    title: Schema.Attribute.String & Schema.Attribute.Required;
-    types: Schema.Attribute.Component<'topic.disease-type', true>;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
