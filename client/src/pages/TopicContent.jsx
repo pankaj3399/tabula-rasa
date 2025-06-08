@@ -201,11 +201,196 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
     });
   };
 
-  // Enhanced markdown to HTML conversion with accordion structure
+  // Comprehensive markdown content processor
+  const processMarkdownContent = (content) => {
+    return (
+      content
+        // Process tables first (before other formatting)
+        .replace(/\n*(\|[^\n]+\|(?:\n\|[^\n]+\|)*)/g, (match, tableContent) => {
+          const lines = tableContent.trim().split('\n');
+          if (lines.length < 2) return match;
+
+          const headerLine = lines[0];
+          const separatorLine = lines[1];
+
+          // Check if second line is a separator (contains dashes)
+          if (!separatorLine || !separatorLine.match(/\|[\s\-:]+\|/)) {
+            return match;
+          }
+
+          const dataLines = lines.slice(2);
+
+          // Parse headers - split by | and filter out empty strings
+          const headers = headerLine
+            .split('|')
+            .map((cell) => cell.trim())
+            .filter((cell) => cell !== '');
+
+          // Parse data rows
+          const rows = dataLines
+            .filter((line) => line.trim() && line.includes('|'))
+            .map((line) =>
+              line
+                .split('|')
+                .map((cell) => cell.trim())
+                .filter((cell, index, arr) => {
+                  // Keep cells that correspond to headers
+                  return index > 0 && index <= headers.length;
+                })
+            );
+
+          let tableHtml = '\n<table class="medical-table">\n';
+          tableHtml += '  <thead>\n    <tr>\n';
+          headers.forEach((header) => {
+            // Process markdown in headers
+            const processedHeader = processMarkdownInline(header);
+            tableHtml += `      <th>${processedHeader}</th>\n`;
+          });
+          tableHtml += '    </tr>\n  </thead>\n';
+
+          if (rows.length > 0) {
+            tableHtml += '  <tbody>\n';
+            rows.forEach((row) => {
+              tableHtml += '    <tr>\n';
+              row.forEach((cell, index) => {
+                if (index < headers.length) {
+                  // Process markdown in cells
+                  const processedCell = processMarkdownInline(cell);
+                  tableHtml += `      <td>${processedCell}</td>\n`;
+                }
+              });
+              tableHtml += '    </tr>\n';
+            });
+            tableHtml += '  </tbody>\n';
+          }
+
+          tableHtml += '</table>\n';
+          return '\n' + tableHtml;
+        })
+        // Process code blocks (before inline code)
+        .replace(/```(\w+)?\n([\s\S]*?)```/g, (match, language, code) => {
+          const lang = language || '';
+          return `<pre class="code-block ${lang}"><code>${escapeHtml(
+            code.trim()
+          )}</code></pre>`;
+        })
+        // Process blockquotes
+        .replace(/^>\s*(.+)$/gm, '<blockquote>$1</blockquote>')
+        // Merge consecutive blockquotes
+        .replace(/(<\/blockquote>\s*<blockquote>)/g, '<br>')
+        // Process horizontal rules
+        .replace(/^---+$/gm, '<hr>')
+        .replace(/^___+$/gm, '<hr>')
+        .replace(/^\*\*\*+$/gm, '<hr>')
+        // Convert headers (in order from largest to smallest to avoid conflicts)
+        .replace(/^##### (.+)$/gm, '<h5>$1</h5>')
+        .replace(/^#### (.+)$/gm, '<h4>$1</h4>')
+        .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+        .replace(/^# (.+)$/gm, '<h1>$1</h1>')
+        // Process strikethrough (before other formatting)
+        .replace(/~~(.+?)~~/g, '<del>$1</del>')
+        // Process bold and italic (order matters!)
+        .replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>') // Bold + Italic
+        .replace(/___(.+?)___/g, '<strong><em>$1</em></strong>') // Bold + Italic alternative
+        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>') // Bold
+        .replace(/__(.+?)__/g, '<strong>$1</strong>') // Bold alternative
+        .replace(/\*(.+?)\*/g, '<em>$1</em>') // Italic
+        .replace(/_(.+?)_/g, '<em>$1</em>') // Italic alternative
+        // Process inline code (after bold/italic to avoid conflicts)
+        .replace(/`([^`]+)`/g, '<code>$1</code>')
+        // Process links
+        .replace(
+          /\[([^\]]+)\]\(([^)]+)\)/g,
+          '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>'
+        )
+        // Process images
+        .replace(
+          /!\[([^\]]*)\]\(([^)]+)\)/g,
+          '<img src="$2" alt="$1" class="markdown-image">'
+        )
+        // Process ordered lists (numbered)
+        .replace(/^\d+\.\s+(.+)$/gm, '<ol-item>$1</ol-item>')
+        // Process unordered lists (bullet points)
+        .replace(/^[\s]*[•\-*+]\s+(.+)$/gm, '<ul-item>$1</ul-item>')
+        // Wrap list items in proper lists
+        .replace(
+          /(<ol-item>.*<\/ol-item>)(\s*<ol-item>.*<\/ol-item>)*/gs,
+          (match) => {
+            const items = match
+              .replace(/<ol-item>/g, '<li>')
+              .replace(/<\/ol-item>/g, '</li>');
+            return `<ol>${items}</ol>`;
+          }
+        )
+        .replace(
+          /(<ul-item>.*<\/ul-item>)(\s*<ul-item>.*<\/ul-item>)*/gs,
+          (match) => {
+            const items = match
+              .replace(/<ul-item>/g, '<li>')
+              .replace(/<\/ul-item>/g, '</li>');
+            return `<ul>${items}</ul>`;
+          }
+        )
+        // Convert line breaks to paragraphs
+        .split('\n\n')
+        .map((paragraph) => {
+          const trimmed = paragraph.trim();
+          if (!trimmed) return '';
+
+          // Don't wrap these elements in paragraphs
+          if (
+            trimmed.match(/^<(h[1-6]|ul|ol|blockquote|hr|div|li|table|pre)/) ||
+            trimmed.startsWith('</') ||
+            trimmed.includes('</table>') ||
+            trimmed.includes('</ul>') ||
+            trimmed.includes('</ol>')
+          ) {
+            return trimmed;
+          }
+
+          // Convert single line breaks to <br> within paragraphs
+          const withBreaks = trimmed.replace(/\n/g, '<br>');
+          return `<p>${withBreaks}</p>`;
+        })
+        .filter((p) => p)
+        .join('\n')
+    );
+  };
+
+  // Process inline markdown (for headers, table cells, etc.)
+  const processMarkdownInline = (text) => {
+    return (
+      text
+        // Process strikethrough first
+        .replace(/~~(.+?)~~/g, '<del>$1</del>')
+        // Process bold and italic (order matters!)
+        .replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>') // Bold + Italic
+        .replace(/___(.+?)___/g, '<strong><em>$1</em></strong>') // Bold + Italic alternative
+        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>') // Bold
+        .replace(/__(.+?)__/g, '<strong>$1</strong>') // Bold alternative
+        .replace(/\*(.+?)\*/g, '<em>$1</em>') // Italic
+        .replace(/_(.+?)_/g, '<em>$1</em>') // Italic alternative
+        // Process inline code
+        .replace(/`([^`]+)`/g, '<code>$1</code>')
+        // Process links
+        .replace(
+          /\[([^\]]+)\]\(([^)]+)\)/g,
+          '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>'
+        )
+    );
+  };
+
+  // Utility function to escape HTML
+  const escapeHtml = (text) => {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  };
+
   const renderContentWithAccordions = (content, subtopicId) => {
     if (!content) return '';
 
-    if (!content.includes('##')) return content;
+    if (!content.includes('##')) return processMarkdownContent(content);
 
     // Split content by H2 headings while preserving the headings
     const sections = content
@@ -238,130 +423,33 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
                 line.trim().startsWith('-') ||
                 line.trim().startsWith('*')
               ) {
-                return `<li>${line.replace(/^[\s]*[•\-*]\s*/, '').trim()}</li>`;
+                // Process markdown in bullet points
+                const processedLine = processMarkdownInline(
+                  line.replace(/^[\s]*[•\-*]\s*/, '').trim()
+                );
+                return `<li>${processedLine}</li>`;
               }
-              return line.trim() ? `<p>${line.trim()}</p>` : '';
+              return line.trim()
+                ? `<p>${processMarkdownInline(line.trim())}</p>`
+                : '';
             })
             .filter((line) => line)
             .join('\n');
 
           sectionContent = `
-          <div class="high-yield-box">
-            <div class="high-yield-title">PANCE High-Yield Points</div>
-            <ul class="high-yield-list">
-              ${processedPoints}
-            </ul>
-          </div>
-        `;
+        <div class="high-yield-box">
+          <div class="high-yield-title">PANCE High-Yield Points</div>
+          <ul class="high-yield-list">
+            ${processedPoints}
+          </ul>
+        </div>
+      `;
         } else {
-        // Process regular markdown content
-          sectionContent = sectionContent
-            // Process tables - Fixed regex and parsing
-            .replace(
-              /\n*(\|[^\n]+\|(?:\n\|[^\n]+\|)*)/g,
-              (match, tableContent) => {
-                const lines = tableContent.trim().split('\n');
-                if (lines.length < 2) return match;
-
-                const headerLine = lines[0];
-                const separatorLine = lines[1];
-
-                // Check if second line is a separator (contains dashes)
-                if (!separatorLine || !separatorLine.match(/\|[\s\-:]+\|/)) {
-                  return match;
-                }
-
-                const dataLines = lines.slice(2);
-                
-                // Parse headers - split by | and filter out empty strings
-                const headers = headerLine
-                  .split('|')
-                  .map((cell) => cell.trim())
-                  .filter((cell) => cell !== '');
-
-                // Parse data rows
-                const rows = dataLines
-                  .filter((line) => line.trim() && line.includes('|'))
-                  .map((line) =>
-                    line
-                      .split('|')
-                      .map((cell) => cell.trim())
-                      .filter((cell, index, arr) => {
-                        // Keep cells that correspond to headers
-                        return index > 0 && index <= headers.length;
-                      })
-                  );
-
-                let tableHtml = '\n<table class="medical-table">\n';
-                tableHtml += '  <thead>\n    <tr>\n';
-                headers.forEach((header) => {
-                  // Process markdown in headers
-                  const processedHeader = header
-                    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-                    .replace(/\*(.+?)\*/g, '<em>$1</em>');
-                  tableHtml += `      <th>${processedHeader}</th>\n`;
-                });
-                tableHtml += '    </tr>\n  </thead>\n';
-
-                if (rows.length > 0) {
-                  tableHtml += '  <tbody>\n';
-                  rows.forEach((row) => {
-                    tableHtml += '    <tr>\n';
-                    row.forEach((cell, index) => {
-                      if (index < headers.length) {
-                        // Process markdown in cells
-                        const processedCell = cell
-                          .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-                          .replace(/\*(.+?)\*/g, '<em>$1</em>')
-                          .replace(/`([^`]+)`/g, '<code>$1</code>');
-                        tableHtml += `      <td>${processedCell}</td>\n`;
-                      }
-                    });
-                    tableHtml += '    </tr>\n';
-                  });
-                  tableHtml += '  </tbody>\n';
-                }
-
-                tableHtml += '</table>\n';
-                return '\n' + tableHtml;
-              }
-            )
-            // Convert headers
-            .replace(/^##### (.+)$/gm, '<h5>$1</h5>')
-            .replace(/^#### (.+)$/gm, '<h4>$1</h4>')
-            .replace(/^### (.+)$/gm, '<h3>$1</h3>')
-            .replace(/^# (.+)$/gm, '<h1>$1</h1>')
-
-            // Convert bold and italic
-            .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-            .replace(/\*(.+?)\*/g, '<em>$1</em>')
-
-            // Convert bullet points
-            .replace(/^[\s]*[•\-*]\s+(.+)$/gm, '<li>$1</li>')
-
-            // Wrap consecutive <li> elements in <ul>
-            .replace(/(<li>.*<\/li>)(\s*<li>.*<\/li>)*/gs, '<ul>$&</ul>')
-
-            // Convert line breaks to paragraphs
-            .split('\n\n')
-            .map((paragraph) => {
-              const trimmed = paragraph.trim();
-              if (!trimmed) return '';
-
-              if (
-                trimmed.match(/^<(h[1-6]|ul|ol|blockquote|hr|div|li|table)/)
-              ) {
-                return trimmed;
-              }
-
-              const withBreaks = trimmed.replace(/\n/g, '<br>');
-              return `<p>${withBreaks}</p>`;
-            })
-            .filter((p) => p)
-            .join('\n');
+          // Process regular markdown content with comprehensive formatting
+          sectionContent = processMarkdownContent(sectionContent);
         }
 
-      return `
+        return `
 <div class="accordion-section" data-accordion-id="${accordionId}">
   <div 
     class="accordion-header ${isExpanded ? 'expanded' : ''}" 
@@ -371,8 +459,10 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
     data-heading-level="2"
     onclick="window.toggleAccordion('${accordionId}')"
   >
-    <h2 class="accordion-title">${title}</h2>
-    <svg class="accordion-icon ${isExpanded ? 'rotated' : ''}" width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+    <h2 class="accordion-title">${processMarkdownInline(title)}</h2>
+    <svg class="accordion-icon ${
+      isExpanded ? 'rotated' : ''
+    }" width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
       <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
     </svg>
   </div>
@@ -1813,6 +1903,139 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
        .medical-content-accordion h3[id] {
          scroll-margin-top: 80px;
        }
+
+       /* Enhanced markdown formatting */
+.medical-content-accordion del {
+  text-decoration: line-through;
+  opacity: 0.7;
+}
+
+.medical-content-accordion em {
+  font-style: italic;
+}
+
+.medical-content-accordion strong em,
+.medical-content-accordion em strong {
+  font-weight: 600;
+  font-style: italic;
+}
+
+.medical-content-accordion a {
+  color: ${darkMode ? '#60a5fa' : '#3b82f6'};
+  text-decoration: underline;
+  transition: color 0.2s ease;
+}
+
+.medical-content-accordion a:hover {
+  color: ${darkMode ? '#93c5fd' : '#1d4ed8'};
+}
+
+.medical-content-accordion hr {
+  border: none;
+  border-top: 2px solid ${darkMode ? '#4b5563' : '#e5e7eb'};
+  margin: 2rem 0;
+  border-radius: 1px;
+}
+
+.medical-content-accordion .code-block {
+  background-color: ${darkMode ? '#1f2937' : '#f8fafc'};
+  border: 1px solid ${darkMode ? '#374151' : '#e2e8f0'};
+  border-radius: 0.5rem;
+  padding: 1rem;
+  margin: 1rem 0;
+  overflow-x: auto;
+  font-family: 'Fira Code', 'Courier New', monospace;
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+
+.medical-content-accordion .code-block code {
+  background: none;
+  border: none;
+  padding: 0;
+  color: ${darkMode ? '#e5e7eb' : '#374151'};
+}
+
+.medical-content-accordion .markdown-image {
+  max-width: 100%;
+  height: auto;
+  border-radius: 0.5rem;
+  margin: 1rem 0;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+.medical-content-accordion ol {
+  margin: 1rem 0;
+  padding-left: 2rem;
+  counter-reset: list-counter;
+}
+
+.medical-content-accordion ol li {
+  list-style: none;
+  position: relative;
+  counter-increment: list-counter;
+  margin: 0.5rem 0;
+  padding-left: 0.5rem;
+}
+
+.medical-content-accordion ol li::before {
+  content: counter(list-counter) ".";
+  position: absolute;
+  left: -2rem;
+  color: ${darkMode ? '#9ca3af' : '#6b7280'};
+  font-weight: 600;
+  min-width: 1.5rem;
+  text-align: right;
+}
+
+/* Nested lists */
+.medical-content-accordion ul ul,
+.medical-content-accordion ol ol,
+.medical-content-accordion ul ol,
+.medical-content-accordion ol ul {
+  margin: 0.25rem 0;
+  padding-left: 1.5rem;
+}
+
+/* Better spacing for consecutive elements */
+.medical-content-accordion h3 + p,
+.medical-content-accordion h4 + p {
+  margin-top: 0.5rem;
+}
+
+.medical-content-accordion p + ul,
+.medical-content-accordion p + ol {
+  margin-top: -0.5rem;
+}
+
+/* Enhanced blockquote styling */
+.medical-content-accordion blockquote {
+  position: relative;
+  quotes: """ """ "'" "'";
+}
+
+.medical-content-accordion blockquote::before {
+  content: open-quote;
+  font-size: 2em;
+  color: ${darkMode ? '#6b7280' : '#9ca3af'};
+  position: absolute;
+  left: -0.5rem;
+  top: -0.5rem;
+  line-height: 1;
+}
+
+/* Ensure proper text wrapping in tables */
+.medical-content-accordion table {
+  table-layout: auto;
+  word-wrap: break-word;
+}
+
+.medical-content-accordion td,
+.medical-content-accordion th {
+  max-width: 300px;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
 
      `}</style>
     </div>
