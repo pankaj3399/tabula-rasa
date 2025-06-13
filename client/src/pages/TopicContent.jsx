@@ -201,223 +201,265 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
     });
   };
 
-  const processMarkdownContent = (content) => {
-    return (
-      content
-        // Process tables first (before other formatting) - IMPROVED VERSION
-        .replace(/\n*(\|[^\n]+\|(?:\n\|[^\n]+\|)*)/g, (match, tableContent) => {
-          const lines = tableContent.trim().split('\n');
-          if (lines.length < 2) return match;
-
-          // Remove empty lines and filter out lines that don't contain proper table structure
-          const validLines = lines.filter((line) => {
-            const trimmedLine = line.trim();
-            return (
-              trimmedLine &&
-              trimmedLine.includes('|') &&
-              trimmedLine.split('|').length >= 3
-            );
-          });
-
-          if (validLines.length < 2) return match;
-
-          const headerLine = validLines[0];
-          const separatorLine = validLines[1];
-
-          // Check if second line is a separator (contains dashes and colons)
-          if (!separatorLine || !separatorLine.match(/\|[\s\-:|\s]+\|/)) {
-            return match;
+// Enhanced markdown content processor - handles your specific table format
+const processMarkdownContent = (content) => {
+  return (
+    content
+      // Process tables first with improved regex and parsing
+      .replace(/(\|[^\n]*\|[\s]*\n)+/g, (match) => {
+        console.log('Raw table match:', match);
+        
+        // Split into lines and clean them up
+        const lines = match
+          .split('\n')
+          .map(line => line.trim())
+          .filter(line => line && line.includes('|'));
+        
+        console.log('Cleaned table lines:', lines);
+        
+        if (lines.length < 2) return match;
+        
+        // Find header and separator
+        let headerIndex = -1;
+        let separatorIndex = -1;
+        
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          // Check if this looks like a separator (contains dashes and pipes)
+          if (line.match(/^\|[\s\-:|]+\|[\s]*$/)) {
+            separatorIndex = i;
+            headerIndex = i - 1;
+            break;
           }
-
-          const dataLines = validLines.slice(2);
-
-          // Parse headers - split by | and clean up
-          const headerCells = headerLine.split('|');
-          const headers = [];
-
-          // Skip first and last empty cells (before first | and after last |)
-          for (let i = 1; i < headerCells.length - 1; i++) {
-            const cell = headerCells[i].trim();
-            if (cell) {
-              headers.push(cell);
+        }
+        
+        // If no clear separator found, try to identify table structure differently
+        if (headerIndex === -1 || separatorIndex === -1) {
+          // Look for the first line that could be a header
+          const potentialHeaders = lines.filter(line => {
+            const cells = line.split('|').filter(cell => cell.trim());
+            return cells.length >= 2 && !line.match(/^[\s\-:|]+$/);
+          });
+          
+          if (potentialHeaders.length === 0) return match;
+          
+          headerIndex = lines.indexOf(potentialHeaders[0]);
+          // Look for separator after header
+          for (let i = headerIndex + 1; i < lines.length; i++) {
+            if (lines[i].match(/[\-:]/)) {
+              separatorIndex = i;
+              break;
             }
           }
-
-          if (headers.length === 0) return match;
-
-          // Parse data rows
-          const rows = [];
-          dataLines.forEach((line) => {
-            if (line.trim() && line.includes('|')) {
-              const cells = line.split('|');
-              const row = [];
-
-              // Skip first and last empty cells, match number of headers
-              for (
-                let i = 1;
-                i < cells.length - 1 && row.length < headers.length;
-                i++
-              ) {
-                row.push(cells[i].trim());
-              }
-
-              // Only add row if it has content
-              if (row.some((cell) => cell.length > 0)) {
-                // Pad row to match header length
-                while (row.length < headers.length) {
-                  row.push('');
-                }
-                rows.push(row);
-              }
+        }
+        
+        if (headerIndex === -1) return match;
+        
+        const headerLine = lines[headerIndex];
+        const dataLines = lines.slice(Math.max(headerIndex + 1, separatorIndex + 1));
+        
+        console.log('Header line:', headerLine);
+        console.log('Data lines:', dataLines);
+        
+        // Parse header
+        const headerCells = headerLine.split('|');
+        const headers = [];
+        
+        for (let i = 0; i < headerCells.length; i++) {
+          const cell = headerCells[i].trim();
+          if (cell && cell !== '**Type**' && cell !== 'Type') {
+            // Clean up bold markers and extra formatting
+            const cleanHeader = cell.replace(/\*\*/g, '').trim();
+            if (cleanHeader) {
+              headers.push(cleanHeader);
             }
+          } else if (cell === '**Type**' || cell === 'Type') {
+            headers.push('Type');
+          }
+        }
+        
+        console.log('Parsed headers:', headers);
+        
+        if (headers.length === 0) return match;
+        
+        // Parse data rows
+        const rows = [];
+        for (const line of dataLines) {
+          if (!line.trim() || line.match(/^[\s\-:|]+$/)) continue;
+          
+          const cells = line.split('|');
+          const row = [];
+          
+          for (let i = 0; i < cells.length; i++) {
+            const cell = cells[i].trim();
+            if (cell || row.length < headers.length) {
+              row.push(cell);
+            }
+          }
+          
+          // Remove empty cells at start/end and ensure we have the right number
+          while (row.length > 0 && !row[0]) row.shift();
+          while (row.length > 0 && !row[row.length - 1]) row.pop();
+          
+          if (row.length > 0) {
+            // Pad or trim to match headers
+            while (row.length < headers.length) row.push('');
+            if (row.length > headers.length) row.length = headers.length;
+            rows.push(row);
+          }
+        }
+        
+        console.log('Parsed rows:', rows);
+        
+        if (rows.length === 0) return match;
+        
+        // Build HTML table
+        let tableHtml = '\n<div class="table-container">\n<table class="medical-table">\n';
+        
+        // Header
+        tableHtml += '  <thead>\n    <tr>\n';
+        headers.forEach(header => {
+          const processedHeader = processMarkdownInline(header);
+          tableHtml += `      <th>${processedHeader}</th>\n`;
+        });
+        tableHtml += '    </tr>\n  </thead>\n';
+        
+        // Body
+        tableHtml += '  <tbody>\n';
+        rows.forEach(row => {
+          tableHtml += '    <tr>\n';
+          row.forEach(cell => {
+            const processedCell = processMarkdownInline(cell);
+            tableHtml += `      <td>${processedCell}</td>\n`;
           });
+          tableHtml += '    </tr>\n';
+        });
+        tableHtml += '  </tbody>\n</table>\n</div>\n';
+        
+        console.log('Generated table HTML:', tableHtml);
+        return tableHtml;
+      })
+      
+      // Process code blocks (before inline code)
+      .replace(/```(\w+)?\n([\s\S]*?)```/g, (match, language, code) => {
+        const lang = language || '';
+        return `<pre class="code-block ${lang}"><code>${escapeHtml(
+          code.trim()
+        )}</code></pre>`;
+      })
+      // Process blockquotes
+      .replace(/^>\s*(.+)$/gm, '<blockquote>$1</blockquote>')
+      // Merge consecutive blockquotes
+      .replace(/(<\/blockquote>\s*<blockquote>)/g, '<br>')
+      // Process horizontal rules
+      .replace(/^---+$/gm, '<hr>')
+      .replace(/^___+$/gm, '<hr>')
+      .replace(/^\*\*\*+$/gm, '<hr>')
+      // Convert headers (in order from largest to smallest to avoid conflicts)
+      .replace(/^##### (.+)$/gm, '<h5>$1</h5>')
+      .replace(/^#### (.+)$/gm, '<h4>$1</h4>')
+      .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+      .replace(/^# (.+)$/gm, '<h1>$1</h1>')
+      // Process strikethrough (before other formatting)
+      .replace(/~~(.+?)~~/g, '<del>$1</del>')
+      // Process bold and italic (order matters!)
+      .replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>') // Bold + Italic
+      .replace(/___(.+?)___/g, '<strong><em>$1</em></strong>') // Bold + Italic alternative
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>') // Bold
+      .replace(/__(.+?)__/g, '<strong>$1</strong>') // Bold alternative
+      .replace(/\*(.+?)\*/g, '<em>$1</em>') // Italic
+      .replace(/_(.+?)_/g, '<em>$1</em>') // Italic alternative
+      // Process inline code (after bold/italic to avoid conflicts)
+      .replace(/`([^`]+)`/g, '<code>$1</code>')
+      // Process links
+      .replace(
+        /\[([^\]]+)\]\(([^)]+)\)/g,
+        '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>'
+      )
+      // Process images
+      .replace(
+        /!\[([^\]]*)\]\(([^)]+)\)/g,
+        '<img src="$2" alt="$1" class="markdown-image">'
+      )
+      // Process ordered lists (numbered)
+      .replace(/^\d+\.\s+(.+)$/gm, '<ol-item>$1</ol-item>')
+      // Process unordered lists (bullet points)
+      .replace(/^[\s]*[•\-*+]\s+(.+)$/gm, '<ul-item>$1</ul-item>')
+      // Wrap list items in proper lists
+      .replace(
+        /(<ol-item>.*<\/ol-item>)(\s*<ol-item>.*<\/ol-item>)*/gs,
+        (match) => {
+          const items = match
+            .replace(/<ol-item>/g, '<li>')
+            .replace(/<\/ol-item>/g, '</li>');
+          return `<ol>${items}</ol>`;
+        }
+      )
+      .replace(
+        /(<ul-item>.*<\/ul-item>)(\s*<ul-item>.*<\/ul-item>)*/gs,
+        (match) => {
+          const items = match
+            .replace(/<ul-item>/g, '<li>')
+            .replace(/<\/ul-item>/g, '</li>');
+          return `<ul>${items}</ul>`;
+        }
+      )
+      // Convert line breaks to paragraphs
+      .split('\n\n')
+      .map((paragraph) => {
+        const trimmed = paragraph.trim();
+        if (!trimmed) return '';
 
-          // Build table HTML
-          let tableHtml = '\n<table class="medical-table">\n';
-          tableHtml += '  <thead>\n    <tr>\n';
+        // Don't wrap these elements in paragraphs
+        if (
+          trimmed.match(/^<(h[1-6]|ul|ol|blockquote|hr|div|li|table|pre)/) ||
+          trimmed.startsWith('</') ||
+          trimmed.includes('</table>') ||
+          trimmed.includes('</ul>') ||
+          trimmed.includes('</ol>') ||
+          trimmed.includes('table-container')
+        ) {
+          return trimmed;
+        }
 
-          headers.forEach((header) => {
-            const processedHeader = processMarkdownInline(header);
-            tableHtml += `      <th>${processedHeader}</th>\n`;
-          });
+        // Convert single line breaks to <br> within paragraphs
+        const withBreaks = trimmed.replace(/\n/g, '<br>');
+        return `<p>${withBreaks}</p>`;
+      })
+      .filter((p) => p)
+      .join('\n')
+  );
+};
 
-          tableHtml += '    </tr>\n  </thead>\n';
+// Process inline markdown (for headers, table cells, etc.)
+const processMarkdownInline = (text) => {
+  return (
+    text
+      // Process strikethrough first
+      .replace(/~~(.+?)~~/g, '<del>$1</del>')
+      // Process bold and italic (order matters!)
+      .replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>') // Bold + Italic
+      .replace(/___(.+?)___/g, '<strong><em>$1</em></strong>') // Bold + Italic alternative
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>') // Bold
+      .replace(/__(.+?)__/g, '<strong>$1</strong>') // Bold alternative
+      .replace(/\*(.+?)\*/g, '<em>$1</em>') // Italic
+      .replace(/_(.+?)_/g, '<em>$1</em>') // Italic alternative
+      // Process inline code
+      .replace(/`([^`]+)`/g, '<code>$1</code>')
+      // Process links
+      .replace(
+        /\[([^\]]+)\]\(([^)]+)\)/g,
+        '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>'
+      )
+  );
+};
 
-          if (rows.length > 0) {
-            tableHtml += '  <tbody>\n';
-            rows.forEach((row) => {
-              tableHtml += '    <tr>\n';
-              row.forEach((cell) => {
-                const processedCell = processMarkdownInline(cell);
-                tableHtml += `      <td>${processedCell}</td>\n`;
-              });
-              tableHtml += '    </tr>\n';
-            });
-            tableHtml += '  </tbody>\n';
-          }
-
-          tableHtml += '</table>\n';
-          return '\n' + tableHtml;
-        })
-        // Process code blocks (before inline code)
-        .replace(/```(\w+)?\n([\s\S]*?)```/g, (match, language, code) => {
-          const lang = language || '';
-          return `<pre class="code-block ${lang}"><code>${escapeHtml(
-            code.trim()
-          )}</code></pre>`;
-        })
-        // Process blockquotes
-        .replace(/^>\s*(.+)$/gm, '<blockquote>$1</blockquote>')
-        // Merge consecutive blockquotes
-        .replace(/(<\/blockquote>\s*<blockquote>)/g, '<br>')
-        // Process horizontal rules
-        .replace(/^---+$/gm, '<hr>')
-        .replace(/^___+$/gm, '<hr>')
-        .replace(/^\*\*\*+$/gm, '<hr>')
-        // Convert headers (in order from largest to smallest to avoid conflicts)
-        .replace(/^##### (.+)$/gm, '<h5>$1</h5>')
-        .replace(/^#### (.+)$/gm, '<h4>$1</h4>')
-        .replace(/^### (.+)$/gm, '<h3>$1</h3>')
-        .replace(/^# (.+)$/gm, '<h1>$1</h1>')
-        // Process strikethrough (before other formatting)
-        .replace(/~~(.+?)~~/g, '<del>$1</del>')
-        // Process bold and italic (order matters!)
-        .replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>') // Bold + Italic
-        .replace(/___(.+?)___/g, '<strong><em>$1</em></strong>') // Bold + Italic alternative
-        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>') // Bold
-        .replace(/__(.+?)__/g, '<strong>$1</strong>') // Bold alternative
-        .replace(/\*(.+?)\*/g, '<em>$1</em>') // Italic
-        .replace(/_(.+?)_/g, '<em>$1</em>') // Italic alternative
-        // Process inline code (after bold/italic to avoid conflicts)
-        .replace(/`([^`]+)`/g, '<code>$1</code>')
-        // Process links
-        .replace(
-          /\[([^\]]+)\]\(([^)]+)\)/g,
-          '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>'
-        )
-        // Process images
-        .replace(
-          /!\[([^\]]*)\]\(([^)]+)\)/g,
-          '<img src="$2" alt="$1" class="markdown-image">'
-        )
-        // Process ordered lists (numbered)
-        .replace(/^\d+\.\s+(.+)$/gm, '<ol-item>$1</ol-item>')
-        // Process unordered lists (bullet points)
-        .replace(/^[\s]*[•\-*+]\s+(.+)$/gm, '<ul-item>$1</ul-item>')
-        // Wrap list items in proper lists
-        .replace(
-          /(<ol-item>.*<\/ol-item>)(\s*<ol-item>.*<\/ol-item>)*/gs,
-          (match) => {
-            const items = match
-              .replace(/<ol-item>/g, '<li>')
-              .replace(/<\/ol-item>/g, '</li>');
-            return `<ol>${items}</ol>`;
-          }
-        )
-        .replace(
-          /(<ul-item>.*<\/ul-item>)(\s*<ul-item>.*<\/ul-item>)*/gs,
-          (match) => {
-            const items = match
-              .replace(/<ul-item>/g, '<li>')
-              .replace(/<\/ul-item>/g, '</li>');
-            return `<ul>${items}</ul>`;
-          }
-        )
-        // Convert line breaks to paragraphs
-        .split('\n\n')
-        .map((paragraph) => {
-          const trimmed = paragraph.trim();
-          if (!trimmed) return '';
-
-          // Don't wrap these elements in paragraphs
-          if (
-            trimmed.match(/^<(h[1-6]|ul|ol|blockquote|hr|div|li|table|pre)/) ||
-            trimmed.startsWith('</') ||
-            trimmed.includes('</table>') ||
-            trimmed.includes('</ul>') ||
-            trimmed.includes('</ol>')
-          ) {
-            return trimmed;
-          }
-
-          // Convert single line breaks to <br> within paragraphs
-          const withBreaks = trimmed.replace(/\n/g, '<br>');
-          return `<p>${withBreaks}</p>`;
-        })
-        .filter((p) => p)
-        .join('\n')
-    );
-  };
-
-  // Process inline markdown (for headers, table cells, etc.) - REMAINS THE SAME
-  const processMarkdownInline = (text) => {
-    return (
-      text
-        // Process strikethrough first
-        .replace(/~~(.+?)~~/g, '<del>$1</del>')
-        // Process bold and italic (order matters!)
-        .replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>') // Bold + Italic
-        .replace(/___(.+?)___/g, '<strong><em>$1</em></strong>') // Bold + Italic alternative
-        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>') // Bold
-        .replace(/__(.+?)__/g, '<strong>$1</strong>') // Bold alternative
-        .replace(/\*(.+?)\*/g, '<em>$1</em>') // Italic
-        .replace(/_(.+?)_/g, '<em>$1</em>') // Italic alternative
-        // Process inline code
-        .replace(/`([^`]+)`/g, '<code>$1</code>')
-        // Process links
-        .replace(
-          /\[([^\]]+)\]\(([^)]+)\)/g,
-          '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>'
-        )
-    );
-  };
-
-  // Utility function to escape HTML - REMAINS THE SAME
-  const escapeHtml = (text) => {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-  };
+// Utility function to escape HTML
+const escapeHtml = (text) => {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+};
 
   const renderContentWithAccordions = (content, subtopicId) => {
     if (!content) return '';
