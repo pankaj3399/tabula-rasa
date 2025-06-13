@@ -201,63 +201,95 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
     });
   };
 
-  // Comprehensive markdown content processor
   const processMarkdownContent = (content) => {
     return (
       content
-        // Process tables first (before other formatting)
+        // Process tables first (before other formatting) - IMPROVED VERSION
         .replace(/\n*(\|[^\n]+\|(?:\n\|[^\n]+\|)*)/g, (match, tableContent) => {
           const lines = tableContent.trim().split('\n');
           if (lines.length < 2) return match;
 
-          const headerLine = lines[0];
-          const separatorLine = lines[1];
+          // Remove empty lines and filter out lines that don't contain proper table structure
+          const validLines = lines.filter((line) => {
+            const trimmedLine = line.trim();
+            return (
+              trimmedLine &&
+              trimmedLine.includes('|') &&
+              trimmedLine.split('|').length >= 3
+            );
+          });
 
-          // Check if second line is a separator (contains dashes)
-          if (!separatorLine || !separatorLine.match(/\|[\s\-:]+\|/)) {
+          if (validLines.length < 2) return match;
+
+          const headerLine = validLines[0];
+          const separatorLine = validLines[1];
+
+          // Check if second line is a separator (contains dashes and colons)
+          if (!separatorLine || !separatorLine.match(/\|[\s\-:|\s]+\|/)) {
             return match;
           }
 
-          const dataLines = lines.slice(2);
+          const dataLines = validLines.slice(2);
 
-          // Parse headers - split by | and filter out empty strings
-          const headers = headerLine
-            .split('|')
-            .map((cell) => cell.trim())
-            .filter((cell) => cell !== '');
+          // Parse headers - split by | and clean up
+          const headerCells = headerLine.split('|');
+          const headers = [];
+
+          // Skip first and last empty cells (before first | and after last |)
+          for (let i = 1; i < headerCells.length - 1; i++) {
+            const cell = headerCells[i].trim();
+            if (cell) {
+              headers.push(cell);
+            }
+          }
+
+          if (headers.length === 0) return match;
 
           // Parse data rows
-          const rows = dataLines
-            .filter((line) => line.trim() && line.includes('|'))
-            .map((line) =>
-              line
-                .split('|')
-                .map((cell) => cell.trim())
-                .filter((cell, index, arr) => {
-                  // Keep cells that correspond to headers
-                  return index > 0 && index <= headers.length;
-                })
-            );
+          const rows = [];
+          dataLines.forEach((line) => {
+            if (line.trim() && line.includes('|')) {
+              const cells = line.split('|');
+              const row = [];
 
+              // Skip first and last empty cells, match number of headers
+              for (
+                let i = 1;
+                i < cells.length - 1 && row.length < headers.length;
+                i++
+              ) {
+                row.push(cells[i].trim());
+              }
+
+              // Only add row if it has content
+              if (row.some((cell) => cell.length > 0)) {
+                // Pad row to match header length
+                while (row.length < headers.length) {
+                  row.push('');
+                }
+                rows.push(row);
+              }
+            }
+          });
+
+          // Build table HTML
           let tableHtml = '\n<table class="medical-table">\n';
           tableHtml += '  <thead>\n    <tr>\n';
+
           headers.forEach((header) => {
-            // Process markdown in headers
             const processedHeader = processMarkdownInline(header);
             tableHtml += `      <th>${processedHeader}</th>\n`;
           });
+
           tableHtml += '    </tr>\n  </thead>\n';
 
           if (rows.length > 0) {
             tableHtml += '  <tbody>\n';
             rows.forEach((row) => {
               tableHtml += '    <tr>\n';
-              row.forEach((cell, index) => {
-                if (index < headers.length) {
-                  // Process markdown in cells
-                  const processedCell = processMarkdownInline(cell);
-                  tableHtml += `      <td>${processedCell}</td>\n`;
-                }
+              row.forEach((cell) => {
+                const processedCell = processMarkdownInline(cell);
+                tableHtml += `      <td>${processedCell}</td>\n`;
               });
               tableHtml += '    </tr>\n';
             });
@@ -357,7 +389,7 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
     );
   };
 
-  // Process inline markdown (for headers, table cells, etc.)
+  // Process inline markdown (for headers, table cells, etc.) - REMAINS THE SAME
   const processMarkdownInline = (text) => {
     return (
       text
@@ -380,7 +412,7 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
     );
   };
 
-  // Utility function to escape HTML
+  // Utility function to escape HTML - REMAINS THE SAME
   const escapeHtml = (text) => {
     const div = document.createElement('div');
     div.textContent = text;
@@ -1681,6 +1713,79 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
          font-style: italic;
          color: ${darkMode ? '#e5e7eb' : '#374151'};
        }
+
+       .medical-content-accordion .medical-table,
+.medical-content-accordion table {
+  border-collapse: separate;
+  border-spacing: 0;
+  margin: 1.5rem 0;
+  font-size: 0.875rem;
+  width: 100%;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+  border-radius: 0.5rem;
+  overflow: hidden;
+  border: 1px solid ${darkMode ? '#4b5563' : '#d1d5db'};
+}
+
+.medical-content-accordion .medical-table th,
+.medical-content-accordion .medical-table td,
+.medical-content-accordion table th,
+.medical-content-accordion table td {
+  padding: 0.75rem 1rem;
+  text-align: left;
+  color: ${darkMode ? '#e5e7eb' : '#374151'};
+  border-right: 1px solid ${darkMode ? '#4b5563' : '#d1d5db'};
+  border-bottom: 1px solid ${darkMode ? '#4b5563' : '#d1d5db'};
+  vertical-align: top;
+  line-height: 1.5;
+}
+
+.medical-content-accordion .medical-table th:last-child,
+.medical-content-accordion .medical-table td:last-child,
+.medical-content-accordion table th:last-child,
+.medical-content-accordion table td:last-child {
+  border-right: none;
+}
+
+.medical-content-accordion .medical-table tr:last-child td,
+.medical-content-accordion table tr:last-child td {
+  border-bottom: none;
+}
+
+.medical-content-accordion .medical-table th,
+.medical-content-accordion table th {
+  background-color: ${darkMode ? '#374151' : '#f8fafc'};
+  font-weight: 600;
+  font-size: 0.875rem;
+  color: ${darkMode ? '#f9fafb' : '#111827'};
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+  border-bottom: 2px solid ${darkMode ? '#4b5563' : '#d1d5db'};
+}
+
+.medical-content-accordion .medical-table tbody tr:hover,
+.medical-content-accordion table tbody tr:hover {
+  background-color: ${darkMode ? '#374151' : '#f9fafb'};
+}
+
+/* Responsive table */
+@media (max-width: 768px) {
+  .medical-content-accordion .medical-table,
+  .medical-content-accordion table {
+    font-size: 0.75rem;
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+  
+  .medical-content-accordion .medical-table th,
+  .medical-content-accordion .medical-table td,
+  .medical-content-accordion table th,
+  .medical-content-accordion table td {
+    padding: 0.5rem;
+    min-width: 120px;
+  }
+}
 
        /* Enhanced dark mode styling for Quill */
        .dark-quill .ql-toolbar {
