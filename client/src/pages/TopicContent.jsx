@@ -5,6 +5,10 @@ import Header from '../components/Header';
 import { useAuth } from '../contexts/AuthContext';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import remarkBreaks from 'remark-breaks';
+import rehypeRaw from 'rehype-raw';
 
 const TopicContent = ({ darkMode, setDarkMode }) => {
   const { slug } = useParams();
@@ -201,389 +205,713 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
     });
   };
 
-// Enhanced markdown content processor - handles your specific table format
-const processMarkdownContent = (content) => {
-  return (
-    content
-      // Process tables first with improved regex and parsing
-      .replace(/(\|[^\n]*\|[\s]*\n)+/g, (match) => {
-        console.log('Raw table match:', match);
-        
-        // Split into lines and clean them up
-        const lines = match
-          .split('\n')
-          .map(line => line.trim())
-          .filter(line => line && line.includes('|'));
-        
-        console.log('Cleaned table lines:', lines);
-        
-        if (lines.length < 2) return match;
-        
-        // Find header and separator
-        let headerIndex = -1;
-        let separatorIndex = -1;
-        
-        for (let i = 0; i < lines.length; i++) {
-          const line = lines[i];
-          // Check if this looks like a separator (contains dashes and pipes)
-          if (line.match(/^\|[\s\-:|]+\|[\s]*$/)) {
-            separatorIndex = i;
-            headerIndex = i - 1;
-            break;
-          }
-        }
-        
-        // If no clear separator found, try to identify table structure differently
-        if (headerIndex === -1 || separatorIndex === -1) {
-          // Look for the first line that could be a header
-          const potentialHeaders = lines.filter(line => {
-            const cells = line.split('|').filter(cell => cell.trim());
-            return cells.length >= 2 && !line.match(/^[\s\-:|]+$/);
-          });
-          
-          if (potentialHeaders.length === 0) return match;
-          
-          headerIndex = lines.indexOf(potentialHeaders[0]);
-          // Look for separator after header
-          for (let i = headerIndex + 1; i < lines.length; i++) {
-            if (lines[i].match(/[\-:]/)) {
-              separatorIndex = i;
-              break;
-            }
-          }
-        }
-        
-        if (headerIndex === -1) return match;
-        
-        const headerLine = lines[headerIndex];
-        const dataLines = lines.slice(Math.max(headerIndex + 1, separatorIndex + 1));
-        
-        console.log('Header line:', headerLine);
-        console.log('Data lines:', dataLines);
-        
-        // Parse header
-        const headerCells = headerLine.split('|');
-        const headers = [];
-        
-        for (let i = 0; i < headerCells.length; i++) {
-          const cell = headerCells[i].trim();
-          if (cell && cell !== '**Type**' && cell !== 'Type') {
-            // Clean up bold markers and extra formatting
-            const cleanHeader = cell.replace(/\*\*/g, '').trim();
-            if (cleanHeader) {
-              headers.push(cleanHeader);
-            }
-          } else if (cell === '**Type**' || cell === 'Type') {
-            headers.push('Type');
-          }
-        }
-        
-        console.log('Parsed headers:', headers);
-        
-        if (headers.length === 0) return match;
-        
-        // Parse data rows
-        const rows = [];
-        for (const line of dataLines) {
-          if (!line.trim() || line.match(/^[\s\-:|]+$/)) continue;
-          
-          const cells = line.split('|');
-          const row = [];
-          
-          for (let i = 0; i < cells.length; i++) {
-            const cell = cells[i].trim();
-            if (cell || row.length < headers.length) {
-              row.push(cell);
-            }
-          }
-          
-          // Remove empty cells at start/end and ensure we have the right number
-          while (row.length > 0 && !row[0]) row.shift();
-          while (row.length > 0 && !row[row.length - 1]) row.pop();
-          
-          if (row.length > 0) {
-            // Pad or trim to match headers
-            while (row.length < headers.length) row.push('');
-            if (row.length > headers.length) row.length = headers.length;
-            rows.push(row);
-          }
-        }
-        
-        console.log('Parsed rows:', rows);
-        
-        if (rows.length === 0) return match;
-        
-        // Build HTML table
-        let tableHtml = '\n<div class="table-container">\n<table class="medical-table">\n';
-        
-        // Header
-        tableHtml += '  <thead>\n    <tr>\n';
-        headers.forEach(header => {
-          const processedHeader = processMarkdownInline(header);
-          tableHtml += `      <th>${processedHeader}</th>\n`;
-        });
-        tableHtml += '    </tr>\n  </thead>\n';
-        
-        // Body
-        tableHtml += '  <tbody>\n';
-        rows.forEach(row => {
-          tableHtml += '    <tr>\n';
-          row.forEach(cell => {
-            const processedCell = processMarkdownInline(cell);
-            tableHtml += `      <td>${processedCell}</td>\n`;
-          });
-          tableHtml += '    </tr>\n';
-        });
-        tableHtml += '  </tbody>\n</table>\n</div>\n';
-        
-        console.log('Generated table HTML:', tableHtml);
-        return tableHtml;
-      })
-      
-      // Process code blocks (before inline code)
-      .replace(/```(\w+)?\n([\s\S]*?)```/g, (match, language, code) => {
-        const lang = language || '';
-        return `<pre class="code-block ${lang}"><code>${escapeHtml(
-          code.trim()
-        )}</code></pre>`;
-      })
-      // Process blockquotes
-      .replace(/^>\s*(.+)$/gm, '<blockquote>$1</blockquote>')
-      // Merge consecutive blockquotes
-      .replace(/(<\/blockquote>\s*<blockquote>)/g, '<br>')
-      // Process horizontal rules
-      .replace(/^---+$/gm, '<hr>')
-      .replace(/^___+$/gm, '<hr>')
-      .replace(/^\*\*\*+$/gm, '<hr>')
-      // Convert headers (in order from largest to smallest to avoid conflicts)
-      .replace(/^##### (.+)$/gm, '<h5>$1</h5>')
-      .replace(/^#### (.+)$/gm, '<h4>$1</h4>')
-      .replace(/^### (.+)$/gm, '<h3>$1</h3>')
-      .replace(/^# (.+)$/gm, '<h1>$1</h1>')
-      // Process strikethrough (before other formatting)
-      .replace(/~~(.+?)~~/g, '<del>$1</del>')
-      // Process bold and italic (order matters!)
-      .replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>') // Bold + Italic
-      .replace(/___(.+?)___/g, '<strong><em>$1</em></strong>') // Bold + Italic alternative
-      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>') // Bold
-      .replace(/__(.+?)__/g, '<strong>$1</strong>') // Bold alternative
-      .replace(/\*(.+?)\*/g, '<em>$1</em>') // Italic
-      .replace(/_(.+?)_/g, '<em>$1</em>') // Italic alternative
-      // Process inline code (after bold/italic to avoid conflicts)
-      .replace(/`([^`]+)`/g, '<code>$1</code>')
-      // Process links
-      .replace(
-        /\[([^\]]+)\]\(([^)]+)\)/g,
-        '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>'
-      )
-      // Process images
-      .replace(
-        /!\[([^\]]*)\]\(([^)]+)\)/g,
-        '<img src="$2" alt="$1" class="markdown-image">'
-      )
-      // Process ordered lists (numbered)
-      .replace(/^\d+\.\s+(.+)$/gm, '<ol-item>$1</ol-item>')
-      // Process unordered lists (bullet points)
-      .replace(/^[\s]*[•\-*+]\s+(.+)$/gm, '<ul-item>$1</ul-item>')
-      // Wrap list items in proper lists
-      .replace(
-        /(<ol-item>.*<\/ol-item>)(\s*<ol-item>.*<\/ol-item>)*/gs,
-        (match) => {
-          const items = match
-            .replace(/<ol-item>/g, '<li>')
-            .replace(/<\/ol-item>/g, '</li>');
-          return `<ol>${items}</ol>`;
-        }
-      )
-      .replace(
-        /(<ul-item>.*<\/ul-item>)(\s*<ul-item>.*<\/ul-item>)*/gs,
-        (match) => {
-          const items = match
-            .replace(/<ul-item>/g, '<li>')
-            .replace(/<\/ul-item>/g, '</li>');
-          return `<ul>${items}</ul>`;
-        }
-      )
-      // Convert line breaks to paragraphs
-      .split('\n\n')
-      .map((paragraph) => {
-        const trimmed = paragraph.trim();
-        if (!trimmed) return '';
+  // Strapi-compatible markdown components - matches Strapi's exact styling
+  const strapiMarkdownComponents = {
+    // Paragraphs - Strapi default styling
+    p: ({ children, ...props }) => (
+      <p 
+        style={{
+          fontSize: '14px',
+          lineHeight: '1.6',
+          marginBottom: '16px',
+          color: darkMode ? '#f1f5f9' : '#32324d',
+          fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif'
+        }}
+        {...props}
+      >
+        {children}
+      </p>
+    ),
 
-        // Don't wrap these elements in paragraphs
-        if (
-          trimmed.match(/^<(h[1-6]|ul|ol|blockquote|hr|div|li|table|pre)/) ||
-          trimmed.startsWith('</') ||
-          trimmed.includes('</table>') ||
-          trimmed.includes('</ul>') ||
-          trimmed.includes('</ol>') ||
-          trimmed.includes('table-container')
-        ) {
-          return trimmed;
-        }
+    // Headings - Strapi default styling
+    h1: ({ children, ...props }) => (
+      <h1 
+        style={{
+          fontSize: '32px',
+          fontWeight: '700',
+          lineHeight: '1.25',
+          marginBottom: '16px',
+          marginTop: '32px',
+          color: darkMode ? '#f1f5f9' : '#32324d',
+          fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif'
+        }}
+        {...props}
+      >
+        {children}
+      </h1>
+    ),
 
-        // Convert single line breaks to <br> within paragraphs
-        const withBreaks = trimmed.replace(/\n/g, '<br>');
-        return `<p>${withBreaks}</p>`;
-      })
-      .filter((p) => p)
-      .join('\n')
-  );
-};
+    h2: ({ children, ...props }) => (
+      <h2 
+        style={{
+          fontSize: '24px',
+          fontWeight: '600',
+          lineHeight: '1.33',
+          marginBottom: '12px',
+          marginTop: '24px',
+          color: darkMode ? '#f1f5f9' : '#32324d',
+          fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif'
+        }}
+        {...props}
+      >
+        {children}
+      </h2>
+    ),
 
-// Process inline markdown (for headers, table cells, etc.)
-const processMarkdownInline = (text) => {
-  return (
-    text
-      // Process strikethrough first
-      .replace(/~~(.+?)~~/g, '<del>$1</del>')
-      // Process bold and italic (order matters!)
-      .replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>') // Bold + Italic
-      .replace(/___(.+?)___/g, '<strong><em>$1</em></strong>') // Bold + Italic alternative
-      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>') // Bold
-      .replace(/__(.+?)__/g, '<strong>$1</strong>') // Bold alternative
-      .replace(/\*(.+?)\*/g, '<em>$1</em>') // Italic
-      .replace(/_(.+?)_/g, '<em>$1</em>') // Italic alternative
-      // Process inline code
-      .replace(/`([^`]+)`/g, '<code>$1</code>')
-      // Process links
-      .replace(
-        /\[([^\]]+)\]\(([^)]+)\)/g,
-        '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>'
-      )
-  );
-};
+    h3: ({ children, ...props }) => (
+      <h3 
+        style={{
+          fontSize: '20px',
+          fontWeight: '600',
+          lineHeight: '1.4',
+          marginBottom: '8px',
+          marginTop: '20px',
+          color: darkMode ? '#f1f5f9' : '#32324d',
+          fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif'
+        }}
+        {...props}
+      >
+        {children}
+      </h3>
+    ),
 
-// Utility function to escape HTML
-const escapeHtml = (text) => {
-  const div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
-};
+    h4: ({ children, ...props }) => (
+      <h4 
+        style={{
+          fontSize: '18px',
+          fontWeight: '600',
+          lineHeight: '1.44',
+          marginBottom: '8px',
+          marginTop: '16px',
+          color: darkMode ? '#f1f5f9' : '#32324d',
+          fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif'
+        }}
+        {...props}
+      >
+        {children}
+      </h4>
+    ),
 
+    h5: ({ children, ...props }) => (
+      <h5 
+        style={{
+          fontSize: '16px',
+          fontWeight: '600',
+          lineHeight: '1.5',
+          marginBottom: '8px',
+          marginTop: '16px',
+          color: darkMode ? '#f1f5f9' : '#32324d',
+          fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif'
+        }}
+        {...props}
+      >
+        {children}
+      </h5>
+    ),
+
+    h6: ({ children, ...props }) => (
+      <h6 
+        style={{
+          fontSize: '14px',
+          fontWeight: '600',
+          lineHeight: '1.57',
+          marginBottom: '8px',
+          marginTop: '12px',
+          color: darkMode ? '#f1f5f9' : '#32324d',
+          fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif'
+        }}
+        {...props}
+      >
+        {children}
+      </h6>
+    ),
+
+    // Strong/Bold - Strapi styling
+    strong: ({ children, ...props }) => (
+      <strong 
+        style={{
+          fontWeight: '700',
+          color: darkMode ? '#f1f5f9' : '#32324d'
+        }}
+        {...props}
+      >
+        {children}
+      </strong>
+    ),
+
+    // Emphasis/Italic - Strapi styling
+    em: ({ children, ...props }) => (
+      <em 
+        style={{
+          fontStyle: 'italic',
+          color: darkMode ? '#f1f5f9' : '#32324d'
+        }}
+        {...props}
+      >
+        {children}
+      </em>
+    ),
+
+    // Lists - Strapi styling
+    ul: ({ children, ...props }) => (
+      <ul 
+        style={{
+          paddingLeft: '24px',
+          marginBottom: '16px',
+          listStyleType: 'disc',
+          color: darkMode ? '#f1f5f9' : '#32324d'
+        }}
+        {...props}
+      >
+        {children}
+      </ul>
+    ),
+
+    ol: ({ children, ...props }) => (
+      <ol 
+        style={{
+          paddingLeft: '24px',
+          marginBottom: '16px',
+          listStyleType: 'decimal',
+          color: darkMode ? '#f1f5f9' : '#32324d'
+        }}
+        {...props}
+      >
+        {children}
+      </ol>
+    ),
+
+    li: ({ children, ...props }) => (
+      <li 
+        style={{
+          fontSize: '14px',
+          lineHeight: '1.6',
+          marginBottom: '4px',
+          color: darkMode ? '#f1f5f9' : '#32324d',
+          fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif'
+        }}
+        {...props}
+      >
+        {children}
+      </li>
+    ),
+
+    // Blockquotes - Strapi styling
+    blockquote: ({ children, ...props }) => (
+      <blockquote 
+        style={{
+          borderLeft: '4px solid #4945ff',
+          paddingLeft: '16px',
+          marginLeft: '0',
+          marginRight: '0',
+          marginBottom: '16px',
+          backgroundColor: darkMode ? 'rgba(73, 69, 255, 0.1)' : 'rgba(73, 69, 255, 0.05)',
+          padding: '16px',
+          borderRadius: '4px',
+          fontStyle: 'italic',
+          color: darkMode ? '#f1f5f9' : '#32324d'
+        }}
+        {...props}
+      >
+        {children}
+      </blockquote>
+    ),
+
+    // Code - Strapi styling
+    code: ({ inline, children, ...props }) => {
+      if (inline) {
+        return (
+          <code
+            style={{
+              backgroundColor: darkMode ? '#1e1e2e' : '#f6f6f9',
+              border: darkMode ? '1px solid #32324d' : '1px solid #dcdce4',
+              borderRadius: '4px',
+              padding: '2px 6px',
+              fontSize: '13px',
+              fontFamily: '"Fira Code", "SF Mono", Monaco, Inconsolata, "Roboto Mono", Consolas, "Andale Mono", monospace',
+              color: darkMode ? '#f1f5f9' : '#32324d'
+            }}
+            {...props}
+          >
+            {children}
+          </code>
+        );
+      }
+
+      return (
+        <code
+          style={{
+            display: 'block',
+            backgroundColor: darkMode ? '#1e1e2e' : '#f6f6f9',
+            border: darkMode ? '1px solid #32324d' : '1px solid #dcdce4',
+            borderRadius: '4px',
+            padding: '16px',
+            fontSize: '13px',
+            fontFamily: '"Fira Code", "SF Mono", Monaco, Inconsolata, "Roboto Mono", Consolas, "Andale Mono", monospace',
+            color: darkMode ? '#f1f5f9' : '#32324d',
+            overflowX: 'auto',
+            marginBottom: '16px'
+          }}
+          {...props}
+        >
+          {children}
+        </code>
+      );
+    },
+
+    // Pre - Strapi styling
+    pre: ({ children, ...props }) => (
+      <pre
+        style={{
+          backgroundColor: darkMode ? '#1e1e2e' : '#f6f6f9',
+          border: darkMode ? '1px solid #32324d' : '1px solid #dcdce4',
+          borderRadius: '4px',
+          padding: '16px',
+          fontSize: '13px',
+          fontFamily: '"Fira Code", "SF Mono", Monaco, Inconsolata, "Roboto Mono", Consolas, "Andale Mono", monospace',
+          color: darkMode ? '#f1f5f9' : '#32324d',
+          overflowX: 'auto',
+          marginBottom: '16px',
+          lineHeight: '1.5'
+        }}
+        {...props}
+      >
+        {children}
+      </pre>
+    ),
+
+    // Tables - Strapi styling
+    table: ({ children, ...props }) => (
+      <div style={{ overflowX: 'auto', marginBottom: '16px' }}>
+        <table 
+          style={{
+            width: '100%',
+            borderCollapse: 'collapse',
+            border: darkMode ? '1px solid #32324d' : '1px solid #dcdce4',
+            borderRadius: '4px',
+            fontSize: '14px',
+            fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif'
+          }}
+          {...props}
+        >
+          {children}
+        </table>
+      </div>
+    ),
+
+    thead: ({ children, ...props }) => (
+      <thead 
+        style={{
+          backgroundColor: darkMode ? '#32324d' : '#f6f6f9'
+        }}
+        {...props}
+      >
+        {children}
+      </thead>
+    ),
+
+    tbody: ({ children, ...props }) => (
+      <tbody {...props}>
+        {children}
+      </tbody>
+    ),
+
+    tr: ({ children, ...props }) => (
+      <tr 
+        style={{
+          borderBottom: darkMode ? '1px solid #32324d' : '1px solid #dcdce4'
+        }}
+        {...props}
+      >
+        {children}
+      </tr>
+    ),
+
+    th: ({ children, ...props }) => (
+      <th 
+        style={{
+          padding: '12px 16px',
+          textAlign: 'left',
+          fontWeight: '600',
+          color: darkMode ? '#f1f5f9' : '#32324d',
+          borderBottom: darkMode ? '1px solid #32324d' : '1px solid #dcdce4',
+          backgroundColor: darkMode ? '#32324d' : '#f6f6f9'
+        }}
+        {...props}
+      >
+        {children}
+      </th>
+    ),
+
+    td: ({ children, ...props }) => (
+      <td 
+        style={{
+          padding: '12px 16px',
+          color: darkMode ? '#f1f5f9' : '#32324d',
+          borderBottom: darkMode ? '1px solid #32324d' : '1px solid #dcdce4'
+        }}
+        {...props}
+      >
+        {children}
+      </td>
+    ),
+
+    // Links - Strapi styling
+    a: ({ children, href, ...props }) => (
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        style={{
+          color: '#4945ff',
+          textDecoration: 'underline',
+          fontWeight: '500'
+        }}
+        {...props}
+      >
+        {children}
+      </a>
+    ),
+
+    // Images - Strapi styling
+    img: ({ src, alt, ...props }) => (
+      <img
+        src={src}
+        alt={alt}
+        style={{
+          maxWidth: '100%',
+          height: 'auto',
+          borderRadius: '4px',
+          marginBottom: '16px'
+        }}
+        {...props}
+      />
+    ),
+
+    // Horizontal Rule - Strapi styling
+    hr: ({ ...props }) => (
+      <hr 
+        style={{
+          border: 'none',
+          borderTop: darkMode ? '1px solid #32324d' : '1px solid #dcdce4',
+          margin: '24px 0'
+        }}
+        {...props}
+      />
+    ),
+
+    // Strikethrough - Strapi styling
+    del: ({ children, ...props }) => (
+      <del 
+        style={{
+          textDecoration: 'line-through',
+          opacity: 0.7
+        }}
+        {...props}
+      >
+        {children}
+      </del>
+    ),
+  };
+
+  // Function to render content with accordions using Strapi styling
   const renderContentWithAccordions = (content, subtopicId) => {
-    if (!content) return '';
+    if (!content) return null;
 
-    if (!content.includes('##')) return processMarkdownContent(content);
+    if (!content.includes('##')) {
+      return (
+        <div className="strapi-content">
+          <ReactMarkdown
+            components={strapiMarkdownComponents}
+            remarkPlugins={[remarkGfm, remarkBreaks]}
+            rehypePlugins={[rehypeRaw]}
+          >
+            {content}
+          </ReactMarkdown>
+        </div>
+      );
+    }
 
     // Split content by H2 headings while preserving the headings
     const sections = content
       .split(/(?=^## )/gm)
       .filter((section) => section.trim());
 
-    return sections
-      .map((section, index) => {
-        const lines = section.trim().split('\n');
-        const h2Line = lines[0];
+    return sections.map((section, index) => {
+      const lines = section.trim().split('\n');
+      const h2Line = lines[0];
 
-        if (!h2Line.startsWith('## ')) return '';
+      if (!h2Line.startsWith('## ')) return null;
 
-        const title = h2Line.replace(/^## /, '').trim();
-        const isHighYield = title.toLowerCase().includes('high-yield');
-        const accordionId = `subtopic-${subtopicId}-heading-h2-${index}`;
-        const isExpanded = expandedAccordions.has(accordionId);
+      const title = h2Line.replace(/^## /, '').trim();
+      const isHighYield = title.toLowerCase().includes('high-yield');
+      const accordionId = `subtopic-${subtopicId}-heading-h2-${index}`;
+      const isExpanded = expandedAccordions.has(accordionId);
 
-        // Process the content (everything after the H2)
-        let sectionContent = lines.slice(1).join('\n');
+      // Process the content (everything after the H2)
+      let sectionContent = lines.slice(1).join('\n');
 
-        // Special processing for High-Yield sections
-        if (isHighYield) {
-          const processedPoints = sectionContent
-            .split('\n')
-            .filter((line) => line.trim())
-            .map((line) => {
-              if (
-                line.trim().startsWith('•') ||
-                line.trim().startsWith('-') ||
-                line.trim().startsWith('*')
-              ) {
-                // Process markdown in bullet points
-                const processedLine = processMarkdownInline(
-                  line.replace(/^[\s]*[•\-*]\s*/, '').trim()
-                );
-                return `<li>${processedLine}</li>`;
-              }
-              return line.trim()
-                ? `<p>${processMarkdownInline(line.trim())}</p>`
-                : '';
-            })
-            .filter((line) => line)
-            .join('\n');
-
-          sectionContent = `
-        <div class="high-yield-box">
-          <div class="high-yield-title">PANCE High-Yield Points</div>
-          <ul class="high-yield-list">
-            ${processedPoints}
-          </ul>
+      return (
+        <div 
+          key={accordionId} 
+          className="accordion-section"
+          data-accordion-id={accordionId}
+          style={{
+            marginBottom: '16px',
+            backgroundColor: darkMode ? '#1e1e2e' : '#ffffff',
+            border: darkMode ? '1px solid #32324d' : '1px solid #dcdce4',
+            borderRadius: '8px',
+            overflow: 'hidden',
+            boxShadow: '0 1px 4px rgba(33, 33, 52, 0.1)'
+          }}
+        >
+          <div 
+            className={`accordion-header ${isExpanded ? 'expanded' : ''}`}
+            id={accordionId}
+            data-heading-key={accordionId}
+            data-subtopic-id={subtopicId}
+            data-heading-level="2"
+            onClick={() => toggleAccordion(accordionId)}
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              padding: '16px 20px',
+              cursor: 'pointer',
+              backgroundColor: darkMode ? '#32324d' : '#f6f6f9',
+              borderBottom: isExpanded ? (darkMode ? '1px solid #32324d' : '1px solid #dcdce4') : 'none',
+              transition: 'background-color 0.2s ease'
+            }}
+          >
+            <h2 
+              style={{
+                margin: '0',
+                fontSize: '18px',
+                fontWeight: '600',
+                color: darkMode ? '#f1f5f9' : '#32324d',
+                fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif',
+                flex: '1'
+              }}
+            >
+              {title}
+            </h2>
+            <svg 
+              style={{
+                width: '20px',
+                height: '20px',
+                transition: 'transform 0.2s ease',
+                transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
+                color: darkMode ? '#8e8ea9' : '#666687',
+                flexShrink: '0',
+                marginLeft: '16px'
+              }}
+              viewBox="0 0 20 20" 
+              fill="currentColor"
+            >
+              <path 
+                fillRule="evenodd" 
+                d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" 
+                clipRule="evenodd" 
+              />
+            </svg>
+          </div>
+          
+          <div 
+            className={`accordion-content ${isExpanded ? 'expanded' : ''}`}
+            style={{
+              maxHeight: isExpanded ? 'none' : '0',
+              overflow: 'hidden',
+              transition: 'max-height 0.3s ease',
+              backgroundColor: darkMode ? '#1e1e2e' : '#ffffff'
+            }}
+          >
+            <div 
+              style={{
+                padding: '24px 20px'
+              }}
+            >
+              {isHighYield ? (
+                <HighYieldSection content={sectionContent} darkMode={darkMode} />
+              ) : (
+                <div className="strapi-content">
+                  <ReactMarkdown
+                    components={strapiMarkdownComponents}
+                    remarkPlugins={[remarkGfm, remarkBreaks]}
+                    rehypePlugins={[rehypeRaw]}
+                  >
+                    {sectionContent}
+                  </ReactMarkdown>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
-      `;
-        } else {
-          // Process regular markdown content with comprehensive formatting
-          sectionContent = processMarkdownContent(sectionContent);
-        }
+      );
+    });
+  };
 
-        return `
-<div class="accordion-section" data-accordion-id="${accordionId}">
-  <div 
-    class="accordion-header ${isExpanded ? 'expanded' : ''}" 
-    id="${accordionId}"
-    data-heading-key="${accordionId}"
-    data-subtopic-id="${subtopicId}"
-    data-heading-level="2"
-    onclick="window.toggleAccordion('${accordionId}')"
-  >
-    <h2 class="accordion-title">${processMarkdownInline(title)}</h2>
-    <svg class="accordion-icon ${
-      isExpanded ? 'rotated' : ''
-    }" width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
-      <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
-    </svg>
-  </div>
-  <div class="accordion-content ${isExpanded ? 'expanded' : ''}">
-    <div class="accordion-body">
-      ${sectionContent}
-    </div>
-  </div>
-</div>
-`;
-      })
-      .join('');
+  // High-yield section component with Strapi styling
+  const HighYieldSection = ({ content, darkMode }) => {
+    // Process high-yield content specially
+    const processHighYieldPoints = (content) => {
+      return content
+        .split('\n')
+        .filter((line) => line.trim())
+        .map((line, index) => {
+          if (
+            line.trim().startsWith('•') ||
+            line.trim().startsWith('-') ||
+            line.trim().startsWith('*')
+          ) {
+            const processedLine = line.replace(/^[\s]*[•\-*]\s*/, '').trim();
+            return (
+              <li key={index}>
+                <ReactMarkdown
+                  components={{
+                    p: ({ children }) => <span>{children}</span>,
+                    strong: ({ children }) => (
+                      <strong style={{ fontWeight: '700', color: darkMode ? '#ffffff' : '#5b21b6' }}>
+                        {children}
+                      </strong>
+                    ),
+                    em: ({ children }) => (
+                      <em style={{ fontStyle: 'italic' }}>
+                        {children}
+                      </em>
+                    ),
+                    code: ({ children }) => (
+                      <code style={{
+                        backgroundColor: darkMode ? 'rgba(139, 92, 246, 0.2)' : 'rgba(139, 92, 246, 0.1)',
+                        border: darkMode ? '1px solid rgba(139, 92, 246, 0.3)' : '1px solid rgba(139, 92, 246, 0.2)',
+                        borderRadius: '3px',
+                        padding: '1px 4px',
+                        fontSize: '12px',
+                        fontFamily: '"Fira Code", monospace',
+                        color: darkMode ? '#a78bfa' : '#7c3aed'
+                      }}>
+                        {children}
+                      </code>
+                    ),
+                  }}
+                  remarkPlugins={[remarkGfm, remarkBreaks]}
+                >
+                  {processedLine}
+                </ReactMarkdown>
+              </li>
+            );
+          }
+          return line.trim() ? (
+            <div key={index} style={{ marginBottom: '8px' }}>
+              <ReactMarkdown
+                components={strapiMarkdownComponents}
+                remarkPlugins={[remarkGfm, remarkBreaks]}
+              >
+                {line.trim()}
+              </ReactMarkdown>
+            </div>
+          ) : null;
+        })
+        .filter(Boolean);
+    };
+
+    const processedPoints = processHighYieldPoints(content);
+
+    return (
+      <div 
+        style={{
+          background: darkMode 
+            ? 'linear-gradient(135deg, #20193A 0%, #1a1332 50%, #16102a 100%)'
+            : 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 50%, #e2e8f0 100%)',
+          borderRadius: '12px',
+          padding: '24px',
+          margin: '16px 0',
+          boxShadow: '0 8px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
+          border: darkMode ? '1px solid rgba(93, 92, 222, 0.3)' : '2px solid #7c3aed',
+          position: 'relative',
+          overflow: 'hidden'
+        }}
+      >
+        <div 
+          style={{
+            color: darkMode ? '#fbbf24' : '#7c3aed',
+            fontWeight: '700',
+            fontSize: '14px',
+            marginBottom: '16px',
+            textTransform: 'uppercase',
+            letterSpacing: '0.05em',
+            textShadow: darkMode 
+              ? '0 1px 2px rgba(0, 0, 0, 0.5)' 
+              : '0 1px 2px rgba(124, 58, 237, 0.3)',
+            fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif'
+          }}
+        >
+          PANCE High-Yield Points
+        </div>
+        <ul 
+          style={{
+            listStyle: 'none',
+            padding: '0',
+            margin: '0'
+          }}
+        >
+          {processedPoints.map((point, index) => (
+            <li 
+              key={index}
+              style={{
+                color: darkMode ? '#ffffff' : '#5b21b6',
+                fontSize: '14px',
+                lineHeight: '1.6',
+                marginBottom: '12px',
+                paddingLeft: '24px',
+                position: 'relative',
+                fontWeight: '400',
+                textShadow: darkMode ? '0 1px 2px rgba(0, 0, 0, 0.2)' : 'none',
+                fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif'
+              }}
+            >
+              <span 
+                style={{
+                  content: '•',
+                  position: 'absolute',
+                  left: '0',
+                  color: darkMode ? '#ffffff' : '#7c3aed',
+                  fontWeight: 'bold',
+                  fontSize: '16px',
+                  top: '0'
+                }}
+              >
+                •
+              </span>
+              {point}
+            </li>
+          ))}
+        </ul>
+      </div>
+    );
   };
 
   // Add IDs to all headings after rendering
-  const addHeadingIds = (content, subtopicId) => {
-    const tempDiv = document.createElement('div');
-    tempDiv.innerHTML = content;
+  const addHeadingIds = () => {
+    useEffect(() => {
+      if (contentContainerRef.current && subtopics.length > 0) {
+        headingRefs.current = {};
 
-    // Add IDs to H2 elements (accordion headers)
-    const h2Elements = tempDiv.querySelectorAll('.accordion-title');
-    h2Elements.forEach((h2, index) => {
-      const headingId = `subtopic-${subtopicId}-heading-h2-${index}`;
-      h2.setAttribute('id', headingId);
-      h2.setAttribute('data-heading-key', headingId);
-      h2.setAttribute('data-subtopic-id', subtopicId);
-      h2.setAttribute('data-heading-level', '2');
-    });
+        subtopics.forEach((subtopic) => {
+          const subtopicData = subtopic.attributes || subtopic;
+          const headings = extractHeadings(subtopicData.content);
 
-    // Add IDs to H3 elements within accordion content
-    const accordionSections = tempDiv.querySelectorAll('.accordion-section');
-    accordionSections.forEach((section, sectionIndex) => {
-      const h3Elements = section.querySelectorAll('h3');
-      h3Elements.forEach((h3, h3Index) => {
-        const headingId = `subtopic-${subtopicId}-heading-h3-${sectionIndex}-${h3Index}`;
-        h3.setAttribute('id', headingId);
-        h3.setAttribute('data-heading-key', headingId);
-        h3.setAttribute('data-subtopic-id', subtopicId);
-        h3.setAttribute('data-heading-level', '3');
-        h3.setAttribute(
-          'data-parent-h2',
-          `subtopic-${subtopicId}-heading-h2-${sectionIndex}`
-        );
-      });
-    });
-
-    return tempDiv.innerHTML;
+          headings.forEach((heading) => {
+            const headingKey = `subtopic-${subtopic.id}-${heading.id}`;
+            const element = contentContainerRef.current.querySelector(
+              `#${headingKey}, [data-heading-key="${headingKey}"]`
+            );
+            if (element) {
+              headingRefs.current[headingKey] = element;
+            }
+          });
+        });
+      }
+    }, [subtopics, expandedAccordions]);
   };
 
   // Add global function for accordion toggle
@@ -638,26 +966,7 @@ const escapeHtml = (text) => {
   }, [navigationItems, expandedAccordions]);
 
   // Set up heading refs after content is rendered
-  useEffect(() => {
-    if (contentContainerRef.current && subtopics.length > 0) {
-      headingRefs.current = {};
-
-      subtopics.forEach((subtopic) => {
-        const subtopicData = subtopic.attributes || subtopic;
-        const headings = extractHeadings(subtopicData.content);
-
-        headings.forEach((heading) => {
-          const headingKey = `subtopic-${subtopic.id}-${heading.id}`;
-          const element = contentContainerRef.current.querySelector(
-            `#${headingKey}, [data-heading-key="${headingKey}"]`
-          );
-          if (element) {
-            headingRefs.current[headingKey] = element;
-          }
-        });
-      });
-    }
-  }, [subtopics, expandedAccordions]);
+  addHeadingIds();
 
   // Drag functionality for resizer
   const handleMouseDown = (e) => {
@@ -1310,24 +1619,25 @@ const escapeHtml = (text) => {
                         } ${darkMode ? 'border-gray-600' : 'border-gray-200'}`}
                       >
                         <h1
-                          className={`text-2xl font-bold ${textColor} mb-6 py-3 border-b ${
-                            darkMode ? 'border-gray-600' : 'border-gray-200'
-                          }`}
+                          style={{
+                            fontSize: '28px',
+                            fontWeight: '700',
+                            lineHeight: '1.25',
+                            marginBottom: '24px',
+                            paddingBottom: '12px',
+                            borderBottom: darkMode ? '1px solid #32324d' : '1px solid #dcdce4',
+                            color: darkMode ? '#f1f5f9' : '#32324d',
+                            fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif'
+                          }}
                         >
                           {subtopicData.title}
                         </h1>
-                        <div
-                          className={`medical-content-accordion ${textColor}`}
-                          dangerouslySetInnerHTML={{
-                            __html: addHeadingIds(
-                              renderContentWithAccordions(
-                                subtopicData.content,
-                                subtopic.id
-                              ),
-                              subtopic.id
-                            ),
-                          }}
-                        />
+                        <div className="strapi-content">
+                          {renderContentWithAccordions(
+                            subtopicData.content,
+                            subtopic.id
+                          )}
+                        </div>
                       </section>
                     );
                   })
@@ -1487,704 +1797,286 @@ const escapeHtml = (text) => {
         </div>
       </div>
 
-      {/* Enhanced Custom CSS for Accordion and Medical Content */}
+      {/* Strapi-style CSS with your existing functionality */}
       <style>{`
-       /* Accordion Styles - IMPROVED DESIGN */
-       .accordion-section {
-         margin-bottom: 0;
-         border-bottom: 1px solid ${darkMode ? '#374151' : '#e5e7eb'};
-         background: ${darkMode ? '#1f2937' : '#ffffff'};
-         border-radius: 8px;
-         margin-bottom: 1rem;
-         overflow: hidden;
-         box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-       }
-
-       .accordion-section:last-child {
-         margin-bottom: 2rem;
-       }
-
-      .accordion-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1.25rem 1.5rem;
-  cursor: pointer;
-  background: ${darkMode ? '#374151' : '#f8fafc'};
-  border-bottom: 1px solid ${darkMode ? '#4b5563' : '#e2e8f0'};
-  transition: all 0.2s ease;
-}
-
-.accordion-header.expanded {
-  position: sticky;
-  top: 0;
-  z-index: 20;
-  background: ${darkMode ? '#4b5563' : '#e2e8f0'};
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-       .accordion-title {
-         margin: 0;
-         font-size: 1.125rem;
-         font-weight: 600;
-         color: ${darkMode ? '#e5e7eb' : '#1f2937'};
-         flex: 1;
-       }
-
-       .accordion-icon {
-         transition: transform 0.2s ease;
-         color: ${darkMode ? '#9ca3af' : '#6b7280'};
-         flex-shrink: 0;
-         margin-left: 1rem;
-       }
-
-       .accordion-icon.rotated {
-         transform: rotate(180deg);
-       }
-
-       .accordion-content {
-         max-height: 0;
-         overflow: hidden;
-         transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-         background: ${darkMode ? '#1f2937' : '#ffffff'};
-       }
-
-       .accordion-content.expanded {
-         max-height: none;
-         overflow: visible;
-       }
-
-       .accordion-body {
-         padding: 2rem 1.5rem;
-       }
-
-       /* High-Yield Points Special Styling - KEPT AS IS */
-       .high-yield-section {
-         margin: 0;
-       }
-
-       .high-yield-box {
-         background: ${
-           darkMode
-             ? '#20193A'
-             : 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 50%, #e2e8f0 100%)'
-         };
-         border-radius: 12px;
-         padding: 1.5rem;
-         margin: 1rem 0;
-         box-shadow: 0 8px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
-         border: ${
-           darkMode ? '1px solid rgba(93, 92, 222, 0.3)' : '2px solid #7c3aed'
-         };
-         position: relative;
-         overflow: hidden;
-       }
-
-       .high-yield-box::before {
-         content: '';
-         position: absolute;
-         top: 0;
-         left: 0;
-         right: 0;
-         bottom: 0;
-         background: ${
-           darkMode
-             ? 'rgba(93, 92, 222, 0.1)'
-             : 'linear-gradient(45deg, rgba(124, 58, 237, 0.05) 0%, rgba(167, 139, 250, 0.03) 100%)'
-         };
-         pointer-events: none;
-       }
-
-       .high-yield-title {
-         color: ${darkMode ? '#fbbf24' : '#7c3aed'};
-         font-weight: 700;
-         font-size: 0.875rem;
-         margin-bottom: 1rem;
-         text-transform: uppercase;
-         letter-spacing: 0.05em;
-         text-shadow: ${
-           darkMode
-             ? '0 1px 2px rgba(0, 0, 0, 0.5)'
-             : '0 1px 2px rgba(124, 58, 237, 0.3)'
-         };
-         position: relative;
-         z-index: 1;
-       }
-
-       .high-yield-list {
-         list-style: none;
-         padding: 0;
-         margin: 0;
-         position: relative;
-         z-index: 1;
-       }
-
-       .high-yield-list li {
-         color: ${darkMode ? '#ffffff' : '#5b21b6'} !important;
-         font-size: 0.875rem;
-         line-height: 1.6;
-         margin-bottom: 0.75rem;
-         padding-left: 1.5rem;
-         position: relative;
-         font-weight: 400;
-         text-shadow: ${darkMode ? '0 1px 2px rgba(0, 0, 0, 0.2)' : 'none'};
-       }
-
-       .high-yield-list li::before {
-         content: '•';
-         position: absolute;
-         left: 0;
-         color: ${darkMode ? '#ffffff' : '#7c3aed'};
-         font-weight: bold;
-         font-size: 1.2rem;
-         top: 0;
-       }
-
-       .high-yield-list li:last-child {
-         margin-bottom: 0;
-       }
-
-       /* Override any conflicting styles for high-yield content */
-       .high-yield-box .high-yield-list li {
-         color: ${darkMode ? '#ffffff' : '#5b21b6'} !important;
-       }
-
-       .high-yield-box * {
-         color: ${darkMode ? '#ffffff' : 'inherit'} !important;
-       }
-
-       /* Medical content - NEUTRAL COLORS EXCEPT HIGH-YIELD */
-       .medical-content-accordion h3 {
-         color: ${darkMode ? '#e5e7eb' : '#374151'};
-         font-weight: 600;
-         margin: 1.5rem 0 0.75rem 0;
-         font-size: 1.1rem;
-         scroll-margin-top: 80px;
-         position: relative;
-         padding-top: 0.5rem;
-       }
-
-       .medical-content-accordion h4 {
-         color: ${darkMode ? '#e5e7eb' : '#374151'};
-         font-weight: 600;
-         margin-top: 1rem;
-         margin-bottom: 0.5rem;
-         font-size: 1rem;
-       }
-
-       .medical-content-accordion ul {
-         margin: 1rem 0;
-         padding-left: 1.5rem;
-       }
-
-       .medical-content-accordion li {
-         margin: 0.5rem 0;
-         line-height: 1.6;
-         color: ${darkMode ? '#e5e7eb' : '#374151'};
-         font-size: 0.875rem;
-       }
-
-       .medical-content-accordion ul > li {
-         list-style-type: none;
-         position: relative;
-       }
-
-       .medical-content-accordion ul > li::before {
-         content: '•';
-         color:${darkMode ? '#9ca3af' : '#6b7280'};
-         font-weight: bold;
-         position: absolute;
-         left: -1.25rem;
-         font-size: 1em;
-       }
-
-       .medical-content-accordion strong {
-         font-weight: 600;
-         color: ${darkMode ? '#e5e7eb' : '#374151'};
-         font-size: 0.875rem;
-       }
-
-       .medical-content-accordion code {
-         background-color: ${darkMode ? '#374151' : '#f3f4f6'};
-         color: ${darkMode ? '#e5e7eb' : '#374151'};
-         padding: 0.15rem 0.3rem;
-         border-radius: 0.2rem;
-         font-size: 0.8rem;
-         font-weight: 500;
-         border: 1px solid ${darkMode ? '#4b5563' : '#e5e7eb'};
-       }
-
-       .medical-content-accordion p {
-         font-size: 0.875rem;
-         line-height: 1.6;
-         margin: 0.875rem 0;
-         color: ${darkMode ? '#e5e7eb' : '#374151'};
-       }
-
-       .medical-content-accordion table {
-         border-collapse: collapse;
-         margin: 1.5rem 0;
-         font-size: 0.875rem;
-         width: 100%;
-         box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
-         border-radius: 0.5rem;
-         overflow: hidden;
-       }
-
-       .medical-content-accordion th,
-       .medical-content-accordion td {
-         padding: 0.75rem;
-         border: 1px solid ${darkMode ? '#4b5563' : '#d1d5db'};
-         text-align: left;
-         color: ${darkMode ? '#e5e7eb' : '#374151'};
-       }
-
-       .medical-content-accordion th {
-         background-color: ${darkMode ? '#374151' : '#f8fafc'};
-         font-weight: 600;
-         font-size: 0.875em;
-         color: ${darkMode ? '#f9fafb' : '#111827'};
-       }
-
-       .medical-content-accordion blockquote {
-         border-left: 4px solid ${darkMode ? '#4b5563' : '#d1d5db'};
-         background-color: ${darkMode ? '#374151' : '#f9fafb'};
-         padding: 1rem 1.5rem;
-         margin: 1.5rem 0;
-         border-radius: 0 0.5rem 0.5rem 0;
-         font-style: italic;
-         color: ${darkMode ? '#e5e7eb' : '#374151'};
-       }
-
-       .medical-content-accordion .medical-table,
-.medical-content-accordion table {
-  border-collapse: separate;
-  border-spacing: 0;
-  margin: 1.5rem 0;
-  font-size: 0.875rem;
-  width: 100%;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
-  border-radius: 0.5rem;
-  overflow: hidden;
-  border: 1px solid ${darkMode ? '#4b5563' : '#d1d5db'};
-}
-
-.medical-content-accordion .medical-table th,
-.medical-content-accordion .medical-table td,
-.medical-content-accordion table th,
-.medical-content-accordion table td {
-  padding: 0.75rem 1rem;
-  text-align: left;
-  color: ${darkMode ? '#e5e7eb' : '#374151'};
-  border-right: 1px solid ${darkMode ? '#4b5563' : '#d1d5db'};
-  border-bottom: 1px solid ${darkMode ? '#4b5563' : '#d1d5db'};
-  vertical-align: top;
-  line-height: 1.5;
-}
-
-.medical-content-accordion .medical-table th:last-child,
-.medical-content-accordion .medical-table td:last-child,
-.medical-content-accordion table th:last-child,
-.medical-content-accordion table td:last-child {
-  border-right: none;
-}
-
-.medical-content-accordion .medical-table tr:last-child td,
-.medical-content-accordion table tr:last-child td {
-  border-bottom: none;
-}
-
-.medical-content-accordion .medical-table th,
-.medical-content-accordion table th {
-  background-color: ${darkMode ? '#374151' : '#f8fafc'};
-  font-weight: 600;
-  font-size: 0.875rem;
-  color: ${darkMode ? '#f9fafb' : '#111827'};
-  text-transform: uppercase;
-  letter-spacing: 0.025em;
-  border-bottom: 2px solid ${darkMode ? '#4b5563' : '#d1d5db'};
-}
-
-.medical-content-accordion .medical-table tbody tr:hover,
-.medical-content-accordion table tbody tr:hover {
-  background-color: ${darkMode ? '#374151' : '#f9fafb'};
-}
-
-/* Responsive table */
-@media (max-width: 768px) {
-  .medical-content-accordion .medical-table,
-  .medical-content-accordion table {
-    font-size: 0.75rem;
-    display: block;
-    overflow-x: auto;
-    white-space: nowrap;
-  }
-  
-  .medical-content-accordion .medical-table th,
-  .medical-content-accordion .medical-table td,
-  .medical-content-accordion table th,
-  .medical-content-accordion table td {
-    padding: 0.5rem;
-    min-width: 120px;
-  }
-}
-
-       /* Enhanced dark mode styling for Quill */
-       .dark-quill .ql-toolbar {
-         border-color: #4b5563;
-         background-color: #374151;
-         padding: 6px;
-       }
-
-       .dark-quill .ql-toolbar .ql-stroke {
-         stroke: #d1d5db;
-       }
-
-       .dark-quill .ql-toolbar .ql-fill {
-         fill: #d1d5db;
-       }
-
-       .dark-quill .ql-toolbar .ql-picker-label {
-         color: #d1d5db;
-       }
-
-       .dark-quill .ql-container {
-         border-color: #4b5563;
-         background-color: #1f2937;
-         color: #e5e7eb;
-       }
-
-       .dark-quill .ql-editor {
-         color: #e5e7eb;
-         padding: 8px;
-         font-size: 14px;
-       }
-
-       .dark-quill .ql-editor.ql-blank::before {
-         color: #9ca3af;
-       }
-
-       .dark-quill .ql-tooltip {
-         background-color: #374151;
-         border-color: #4b5563;
-         color: #e5e7eb;
-       }
-
-       .dark-quill .ql-tooltip input {
-         background-color: #1f2937;
-         border-color: #4b5563;
-         color: #e5e7eb;
-       }
-
-       /* Compact quill editor */
-       .compact-quill .ql-toolbar {
-         padding: 4px;
-       }
-
-       .compact-quill .ql-toolbar .ql-formats {
-         margin-right: 8px;
-       }
-
-       .compact-quill .ql-editor {
-         padding: 6px;
-         font-size: 13px;
-         line-height: 1.4;
-       }
-
-       .compact-quill .ql-toolbar button {
-         width: 24px;
-         height: 24px;
-         padding: 2px;
-       }
-
-       .compact-quill .ql-toolbar button svg {
-         width: 12px;
-         height: 12px;
-       }
-
-       /* Navigation hierarchy improvements */
-       .border-l-3 {
-         border-left-width: 3px;
-         transition: all 0.2s ease-in-out;
-       }
-
-       /* Smooth scrolling */
-       .scroll-smooth {
-         scroll-behavior: smooth;
-       }
-
-       /* Custom scrollbar */
-       .overflow-y-auto::-webkit-scrollbar {
-         width: 6px;
-       }
-
-       .overflow-y-auto::-webkit-scrollbar-track {
-         background: ${darkMode ? '#1f2937' : '#f1f5f9'};
-       }
-
-       .overflow-y-auto::-webkit-scrollbar-thumb {
-         background: ${darkMode ? '#4b5563' : '#cbd5e1'};
-         border-radius: 3px;
-       }
-
-       .overflow-y-auto::-webkit-scrollbar-thumb:hover {
-         background: ${darkMode ? '#6b7280' : '#94a3b8'};
-       }
-
-       /* Resizer cursor */
-       .cursor-col-resize {
-         cursor: col-resize;
-       }
-
-       /* Dragging state */
-       ${
-         isDragging
-           ? `
-         .content-resizer-container * {
-           user-select: none;
-           pointer-events: none;
-         }
-         
-         .content-resizer-container {
-           cursor: col-resize;
-         }
-       `
-           : ''
-       }
-
-       /* Better visual feedback for navigation items */
-       nav button {
-         border-radius: 0.375rem;
-         margin-bottom: 0.125rem;
-       }
-
-       nav button:hover {
-         transform: translateX(2px);
-       }
-
-       /* Ensure accordion headers are clickable */
-       .accordion-header {
-         -webkit-user-select: none;
-         -moz-user-select: none;
-         -ms-user-select: none;
-         user-select: none;
-       }
-
-       /* Prevent text selection during resize */
-       .content-resizer-container.dragging {
-         -webkit-user-select: none;
-         -moz-user-select: none;
-         -ms-user-select: none;
-         user-select: none;
-       }
-
-       /* Focus states for accessibility */
-       button:focus {
-         outline: 2px solid ${darkMode ? '#2563eb' : '#3b82f6'};
-         outline-offset: 1px;
-       }
-
-       .accordion-header:focus {
-         outline: 2px solid ${darkMode ? '#2563eb' : '#3b82f6'};
-         outline-offset: -2px;
-       }
-
-       /* Loading animation */
-       @keyframes pulse {
-         0%, 100% { opacity: 1; }
-         50% { opacity: 0.5; }
-       }
-
-       .animate-pulse {
-         animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-       }
-
-       /* Responsive design */
-       @media (max-width: 768px) {
-         .medical-content-accordion {
-           font-size: 0.8rem;
-         }
-         
-         .accordion-header {
-           padding: 1rem;
-         }
-
-         .accordion-title {
-           font-size: 1rem;
-         }
-
-         .accordion-body {
-           padding: 1.5rem 1rem;
-         }
-
-         .high-yield-box {
-           padding: 1rem;
-           margin: 0.5rem 0;
-         }
-
-         .high-yield-list li {
-           font-size: 0.8rem;
-           padding-left: 1.2rem;
-         }
-       }
-
-       /* Animation for active sections */
-       .transition-all {
-         transition-property: all;
-         transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-         transition-duration: 200ms;
-       }
-
-       /* Accordion animation improvements */
-       .accordion-content {
-         transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-       }
-
-       /* Better spacing for accordion sections */
-       .accordion-section + .accordion-section {
-         margin-top: 0;
-       }
-
-       /* Ensure proper heading IDs for navigation */
-       .medical-content-accordion h2[id],
-       .medical-content-accordion h3[id] {
-         scroll-margin-top: 80px;
-       }
-
-       /* Enhanced markdown formatting */
-.medical-content-accordion del {
-  text-decoration: line-through;
-  opacity: 0.7;
-}
-
-.medical-content-accordion em {
-  font-style: italic;
-}
-
-.medical-content-accordion strong em,
-.medical-content-accordion em strong {
-  font-weight: 600;
-  font-style: italic;
-}
-
-.medical-content-accordion a {
-  color: ${darkMode ? '#60a5fa' : '#3b82f6'};
-  text-decoration: underline;
-  transition: color 0.2s ease;
-}
-
-.medical-content-accordion a:hover {
-  color: ${darkMode ? '#93c5fd' : '#1d4ed8'};
-}
-
-.medical-content-accordion hr {
-  border: none;
-  border-top: 2px solid ${darkMode ? '#4b5563' : '#e5e7eb'};
-  margin: 2rem 0;
-  border-radius: 1px;
-}
-
-.medical-content-accordion .code-block {
-  background-color: ${darkMode ? '#1f2937' : '#f8fafc'};
-  border: 1px solid ${darkMode ? '#374151' : '#e2e8f0'};
-  border-radius: 0.5rem;
-  padding: 1rem;
-  margin: 1rem 0;
-  overflow-x: auto;
-  font-family: 'Fira Code', 'Courier New', monospace;
-  font-size: 0.875rem;
-  line-height: 1.4;
-}
-
-.medical-content-accordion .code-block code {
-  background: none;
-  border: none;
-  padding: 0;
-  color: ${darkMode ? '#e5e7eb' : '#374151'};
-}
-
-.medical-content-accordion .markdown-image {
-  max-width: 100%;
-  height: auto;
-  border-radius: 0.5rem;
-  margin: 1rem 0;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-}
-
-.medical-content-accordion ol {
-  margin: 1rem 0;
-  padding-left: 2rem;
-  counter-reset: list-counter;
-}
-
-.medical-content-accordion ol li {
-  list-style: none;
-  position: relative;
-  counter-increment: list-counter;
-  margin: 0.5rem 0;
-  padding-left: 0.5rem;
-}
-
-.medical-content-accordion ol li::before {
-  content: counter(list-counter) ".";
-  position: absolute;
-  left: -2rem;
-  color: ${darkMode ? '#9ca3af' : '#6b7280'};
-  font-weight: 600;
-  min-width: 1.5rem;
-  text-align: right;
-}
-
-/* Nested lists */
-.medical-content-accordion ul ul,
-.medical-content-accordion ol ol,
-.medical-content-accordion ul ol,
-.medical-content-accordion ol ul {
-  margin: 0.25rem 0;
-  padding-left: 1.5rem;
-}
-
-/* Better spacing for consecutive elements */
-.medical-content-accordion h3 + p,
-.medical-content-accordion h4 + p {
-  margin-top: 0.5rem;
-}
-
-.medical-content-accordion p + ul,
-.medical-content-accordion p + ol {
-  margin-top: -0.5rem;
-}
-
-/* Enhanced blockquote styling */
-.medical-content-accordion blockquote {
-  position: relative;
-  quotes: """ """ "'" "'";
-}
-
-.medical-content-accordion blockquote::before {
-  content: open-quote;
-  font-size: 2em;
-  color: ${darkMode ? '#6b7280' : '#9ca3af'};
-  position: absolute;
-  left: -0.5rem;
-  top: -0.5rem;
-  line-height: 1;
-}
-
-/* Ensure proper text wrapping in tables */
-.medical-content-accordion table {
-  table-layout: auto;
-  word-wrap: break-word;
-}
-
-.medical-content-accordion td,
-.medical-content-accordion th {
-  max-width: 300px;
-  word-wrap: break-word;
-  overflow-wrap: break-word;
-}
-
-     `}</style>
+        /* Strapi-inspired base styles */
+        .strapi-content {
+          font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+          line-height: 1.6;
+          color: ${darkMode ? '#f1f5f9' : '#32324d'};
+        }
+
+        /* High-yield section styling - keeping your existing design */
+        .high-yield-box {
+          background: ${
+            darkMode
+              ? 'linear-gradient(135deg, #20193A 0%, #1a1332 50%, #16102a 100%)'
+              : 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 50%, #e2e8f0 100%)'
+          };
+          border-radius: 12px;
+          padding: 24px;
+          margin: 16px 0;
+          box-shadow: 0 8px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+          border: ${
+            darkMode ? '1px solid rgba(93, 92, 222, 0.3)' : '2px solid #7c3aed'
+          };
+          position: relative;
+          overflow: hidden;
+        }
+
+        .high-yield-box::before {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: ${
+            darkMode
+              ? 'rgba(93, 92, 222, 0.1)'
+              : 'linear-gradient(45deg, rgba(124, 58, 237, 0.05) 0%, rgba(167, 139, 250, 0.03) 100%)'
+          };
+          pointer-events: none;
+        }
+
+        /* Accordion styles with Strapi-like appearance */
+        .accordion-section {
+          margin-bottom: 16px;
+          background: ${darkMode ? '#1e1e2e' : '#ffffff'};
+          border: ${darkMode ? '1px solid #32324d' : '1px solid #dcdce4'};
+          border-radius: 8px;
+          overflow: hidden;
+          box-shadow: 0 1px 4px rgba(33, 33, 52, 0.1);
+        }
+
+        .accordion-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 16px 20px;
+          cursor: pointer;
+          background: ${darkMode ? '#32324d' : '#f6f6f9'};
+          transition: background-color 0.2s ease;
+          user-select: none;
+        }
+
+        .accordion-header:hover {
+          background: ${darkMode ? '#3c3c4e' : '#eeeff2'};
+        }
+
+        .accordion-header.expanded {
+          background: ${darkMode ? '#3c3c4e' : '#eeeff2'};
+          border-bottom: ${darkMode ? '1px solid #32324d' : '1px solid #dcdce4'};
+          position: sticky;
+          top: 0;
+          z-index: 20;
+          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .accordion-content {
+          max-height: 0;
+          overflow: hidden;
+          transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          background: ${darkMode ? '#1e1e2e' : '#ffffff'};
+        }
+
+        .accordion-content.expanded {
+          max-height: none;
+          overflow: visible;
+        }
+
+        /* Enhanced dark mode styling for Quill */
+        .dark-quill .ql-toolbar {
+          border-color: #32324d;
+          background-color: #32324d;
+          padding: 6px;
+        }
+
+        .dark-quill .ql-toolbar .ql-stroke {
+          stroke: #f1f5f9;
+        }
+
+        .dark-quill .ql-toolbar .ql-fill {
+          fill: #f1f5f9;
+        }
+
+        .dark-quill .ql-toolbar .ql-picker-label {
+          color: #f1f5f9;
+        }
+
+        .dark-quill .ql-container {
+          border-color: #32324d;
+          background-color: #1e1e2e;
+          color: #f1f5f9;
+        }
+
+        .dark-quill .ql-editor {
+          color: #f1f5f9;
+          padding: 8px;
+          font-size: 14px;
+        }
+
+        .dark-quill .ql-editor.ql-blank::before {
+          color: #8e8ea9;
+        }
+
+        .dark-quill .ql-tooltip {
+          background-color: #32324d;
+          border-color: #32324d;
+          color: #f1f5f9;
+        }
+
+        .dark-quill .ql-tooltip input {
+          background-color: #1e1e2e;
+          border-color: #32324d;
+          color: #f1f5f9;
+        }
+
+        /* Compact quill editor */
+        .compact-quill .ql-toolbar {
+          padding: 4px;
+        }
+
+        .compact-quill .ql-toolbar .ql-formats {
+          margin-right: 8px;
+        }
+
+        .compact-quill .ql-editor {
+          padding: 6px;
+          font-size: 13px;
+          line-height: 1.4;
+        }
+
+        .compact-quill .ql-toolbar button {
+          width: 24px;
+          height: 24px;
+          padding: 2px;
+        }
+
+        .compact-quill .ql-toolbar button svg {
+          width: 12px;
+          height: 12px;
+        }
+
+        /* Navigation hierarchy improvements */
+        .border-l-3 {
+          border-left-width: 3px;
+          transition: all 0.2s ease-in-out;
+        }
+
+        /* Custom scrollbar */
+        .overflow-y-auto::-webkit-scrollbar {
+          width: 6px;
+        }
+
+        .overflow-y-auto::-webkit-scrollbar-track {
+          background: ${darkMode ? '#1e1e2e' : '#f6f6f9'};
+        }
+
+        .overflow-y-auto::-webkit-scrollbar-thumb {
+          background: ${darkMode ? '#32324d' : '#dcdce4'};
+          border-radius: 3px;
+        }
+
+        .overflow-y-auto::-webkit-scrollbar-thumb:hover {
+          background: ${darkMode ? '#3c3c4e' : '#c6c7d0'};
+        }
+
+        /* Resizer cursor */
+        .cursor-col-resize {
+          cursor: col-resize;
+        }
+
+        /* Dragging state */
+        ${
+          isDragging
+            ? `
+          .content-resizer-container * {
+            user-select: none;
+            pointer-events: none;
+          }
+          
+          .content-resizer-container {
+            cursor: col-resize;
+          }
+        `
+            : ''
+        }
+
+        /* Better visual feedback for navigation items */
+        nav button {
+          border-radius: 6px;
+          margin-bottom: 2px;
+        }
+
+        nav button:hover {
+          transform: translateX(2px);
+        }
+
+        /* Focus states for accessibility */
+        button:focus {
+          outline: 2px solid #4945ff;
+          outline-offset: 1px;
+        }
+
+        .accordion-header:focus {
+          outline: 2px solid #4945ff;
+          outline-offset: -2px;
+        }
+
+        /* Responsive design */
+        @media (max-width: 768px) {
+          .strapi-content {
+            font-size: 13px;
+          }
+          
+          .accordion-header {
+            padding: 12px 16px;
+          }
+
+          .accordion-body {
+            padding: 20px 16px;
+          }
+
+          .high-yield-box {
+            padding: 16px;
+            margin: 12px 0;
+          }
+        }
+
+        /* Animation for active sections */
+        .transition-all {
+          transition-property: all;
+          transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+          transition-duration: 200ms;
+        }
+
+        /* Ensure proper heading IDs for navigation */
+        .strapi-content h2[id],
+        .strapi-content h3[id] {
+          scroll-margin-top: 80px;
+        }
+
+        /* Prevent text selection during resize */
+        .content-resizer-container.dragging {
+          user-select: none;
+        }
+
+        /* Loading animation */
+        @keyframes pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.5; }
+        }
+
+        .animate-pulse {
+          animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+
+        /* Better spacing for accordion sections */
+        .accordion-section + .accordion-section {
+          margin-top: 0;
+        }
+      `}</style>
     </div>
   );
 };
