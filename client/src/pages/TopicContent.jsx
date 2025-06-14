@@ -480,17 +480,19 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
       </pre>
     ),
 
-    // Tables - Strapi styling
+    // Tables - Strapi styling with proper borders
     table: ({ children, ...props }) => (
       <div style={{ overflowX: 'auto', marginBottom: '16px' }}>
         <table 
           style={{
             width: '100%',
-            borderCollapse: 'collapse',
+            borderCollapse: 'separate',
+            borderSpacing: '0',
             border: darkMode ? '1px solid #32324d' : '1px solid #dcdce4',
             borderRadius: '4px',
             fontSize: '14px',
-            fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif'
+            fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif',
+            overflow: 'hidden'
           }}
           {...props}
         >
@@ -534,8 +536,10 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
           textAlign: 'left',
           fontWeight: '600',
           color: darkMode ? '#f1f5f9' : '#32324d',
-          borderBottom: darkMode ? '1px solid #32324d' : '1px solid #dcdce4',
-          backgroundColor: darkMode ? '#32324d' : '#f6f6f9'
+          borderRight: darkMode ? '1px solid #32324d' : '1px solid #dcdce4',
+          borderBottom: darkMode ? '2px solid #32324d' : '2px solid #dcdce4',
+          backgroundColor: darkMode ? '#32324d' : '#f6f6f9',
+          verticalAlign: 'top'
         }}
         {...props}
       >
@@ -548,7 +552,10 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
         style={{
           padding: '12px 16px',
           color: darkMode ? '#f1f5f9' : '#32324d',
-          borderBottom: darkMode ? '1px solid #32324d' : '1px solid #dcdce4'
+          borderRight: darkMode ? '1px solid #32324d' : '1px solid #dcdce4',
+          borderBottom: darkMode ? '1px solid #32324d' : '1px solid #dcdce4',
+          verticalAlign: 'top',
+          lineHeight: '1.5'
         }}
         {...props}
       >
@@ -1804,6 +1811,46 @@ const TopicContent = ({ darkMode, setDarkMode }) => {
           font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
           line-height: 1.6;
           color: ${darkMode ? '#f1f5f9' : '#32324d'};
+        }
+
+        /* Enhanced table styling for better column/row separation */
+        .strapi-content table {
+          border-collapse: separate !important;
+          border-spacing: 0 !important;
+          border: ${darkMode ? '1px solid #32324d' : '1px solid #dcdce4'} !important;
+          border-radius: 4px !important;
+          overflow: hidden !important;
+          box-shadow: 0 1px 3px rgba(33, 33, 52, 0.1);
+        }
+
+        .strapi-content table th:last-child,
+        .strapi-content table td:last-child {
+          border-right: none !important;
+        }
+
+        .strapi-content table tr:last-child td {
+          border-bottom: none !important;
+        }
+
+        .strapi-content table tr:hover {
+          background-color: ${darkMode ? 'rgba(60, 60, 78, 0.5)' : 'rgba(246, 246, 249, 0.8)'} !important;
+        }
+
+        .strapi-content table th {
+          background-color: ${darkMode ? '#32324d' : '#f6f6f9'} !important;
+          border-right: ${darkMode ? '1px solid #32324d' : '1px solid #dcdce4'} !important;
+          border-bottom: ${darkMode ? '2px solid #32324d' : '2px solid #dcdce4'} !important;
+          font-weight: 600 !important;
+          text-transform: uppercase !important;
+          letter-spacing: 0.025em !important;
+          font-size: 13px !important;
+        }
+
+        .strapi-content table td {
+          border-right: ${darkMode ? '1px solid #32324d' : '1px solid #dcdce4'} !important;
+          border-bottom: ${darkMode ? '1px solid #32324d' : '1px solid #dcdce4'} !important;
+          vertical-align: top !important;
+          line-height: 1.5 !important;
         }
 
         /* High-yield section styling - keeping your existing design */
